@@ -1,0 +1,123 @@
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X github.com/maxtechera/admirarr/internal/ui.Version={{.Version}}
+    binary: admirarr
+
+universal_binaries:
+  - replace: true
+
+archives:
+  - format: tar.gz
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    format_overrides:
+      - goos: windows
+        format: zip
+
+nfpms:
+  - id: admirarr
+    package_name: admirarr
+    vendor: maxtechera
+    homepage: https://github.com/maxtechera/admirarr
+    maintainer: Max Techera <max@maxtechera.com>
+    description: Command your fleet — CLI for Plex + *Arr media server stack
+    license: MIT
+    formats:
+      - deb
+      - rpm
+    bindir: /usr/bin
+
+brews:
+  - repository:
+      owner: maxtechera
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Formula
+    homepage: https://github.com/maxtechera/admirarr
+    description: Command your fleet — CLI for Plex + *Arr media server stack
+    license: MIT
+    install: |
+      bin.install "admirarr"
+    test: |
+      system "#{bin}/admirarr", "--version"
+
+scoops:
+  - repository:
+      owner: maxtechera
+      name: scoop-bucket
+      token: "{{ .Env.SCOOP_BUCKET_TOKEN }}"
+    homepage: https://github.com/maxtechera/admirarr
+    description: Command your fleet — CLI for Plex + *Arr media server stack
+    license: MIT
+
+dockers:
+  - image_templates:
+      - "ghcr.io/maxtechera/admirarr:{{ .Version }}-amd64"
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/amd64"
+    dockerfile: dist/docker/Dockerfile
+    goarch: amd64
+  - image_templates:
+      - "ghcr.io/maxtechera/admirarr:{{ .Version }}-arm64"
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/arm64"
+    dockerfile: dist/docker/Dockerfile
+    goarch: arm64
+
+docker_manifests:
+  - name_template: "ghcr.io/maxtechera/admirarr:{{ .Version }}"
+    image_templates:
+      - "ghcr.io/maxtechera/admirarr:{{ .Version }}-amd64"
+      - "ghcr.io/maxtechera/admirarr:{{ .Version }}-arm64"
+  - name_template: "ghcr.io/maxtechera/admirarr:latest"
+    image_templates:
+      - "ghcr.io/maxtechera/admirarr:{{ .Version }}-amd64"
+      - "ghcr.io/maxtechera/admirarr:{{ .Version }}-arm64"
+
+snapcrafts:
+  - name: admirarr
+    summary: Command your fleet — CLI for Plex + *Arr media server stack
+    description: |
+      Admirarr is a CLI for managing your Plex + *Arr media server stack.
+      Dashboard views, diagnostics, search, and management for
+      Plex, Radarr, Sonarr, Prowlarr, qBittorrent, Tautulli, and more.
+    grade: stable
+    confinement: classic
+    license: MIT
+    publish: true
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+      - "^chore:"
+
+release:
+  github:
+    owner: maxtechera
+    name: admirarr
+  prerelease: auto
+  name_template: "v{{ .Version }}"
