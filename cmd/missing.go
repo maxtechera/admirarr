@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/maxtechera/admirarr/internal/api"
+	"github.com/maxtechera/admirarr/internal/arr"
 	"github.com/maxtechera/admirarr/internal/ui"
 	"github.com/spf13/cobra"
 )
@@ -28,62 +28,74 @@ func init() {
 }
 
 func runMissing(cmd *cobra.Command, args []string) {
-	ui.PrintBanner()
-	fmt.Println(ui.Bold("\n  Missing Content\n"))
+	type missingMovieOut struct {
+		Title  string `json:"title"`
+		Year   int    `json:"year"`
+		Status string `json:"status"`
+	}
+	type missingEpisodeOut struct {
+		Series  string `json:"series"`
+		Season  int    `json:"season"`
+		Episode int    `json:"episode"`
+		Title   string `json:"title"`
+	}
+	type missingOut struct {
+		Movies   []missingMovieOut   `json:"movies"`
+		Episodes []missingEpisodeOut `json:"episodes"`
+	}
+
+	out := missingOut{Movies: []missingMovieOut{}, Episodes: []missingEpisodeOut{}}
 
 	// Movies
-	var movies []struct {
-		Title     string `json:"title"`
-		Year      int    `json:"year"`
-		HasFile   bool   `json:"hasFile"`
-		Monitored bool   `json:"monitored"`
-		Status    string `json:"status"`
-	}
-	if err := api.GetJSON("radarr", "api/v3/movie", nil, &movies); err == nil {
-		var missing []int
-		for i, m := range movies {
+	movies, moviesErr := arr.New("radarr").Movies()
+	if moviesErr == nil {
+		for _, m := range movies {
 			if m.Monitored && !m.HasFile {
-				missing = append(missing, i)
+				out.Movies = append(out.Movies, missingMovieOut{Title: m.Title, Year: m.Year, Status: m.Status})
 			}
 		}
-		fmt.Println(ui.Bold(fmt.Sprintf("  Movies (%d missing)", len(missing))))
-		for _, i := range missing {
-			m := movies[i]
-			fmt.Printf("  %s %s (%d) — %s\n", ui.Err("○"), m.Title, m.Year, m.Status)
-		}
-	} else {
-		fmt.Printf("  %s\n", ui.Err("Cannot reach Radarr"))
 	}
 
 	// Episodes
-	fmt.Println()
-	var eps struct {
-		TotalRecords int `json:"totalRecords"`
-		Records      []struct {
-			Title         string `json:"title"`
-			SeasonNumber  int    `json:"seasonNumber"`
-			EpisodeNumber int    `json:"episodeNumber"`
-			Series        struct {
-				Title string `json:"title"`
-			} `json:"series"`
-		} `json:"records"`
-	}
-	params := map[string]string{
-		"pageSize":      "20",
+	eps, epsErr := arr.New("sonarr").WantedMissing(20, map[string]string{
 		"sortKey":       "airDateUtc",
 		"sortDirection": "descending",
-	}
-	if err := api.GetJSON("sonarr", "api/v3/wanted/missing", params, &eps); err == nil {
-		fmt.Println(ui.Bold(fmt.Sprintf("  Episodes (%d missing)", eps.TotalRecords)))
-		limit := 15
-		if len(eps.Records) < limit {
-			limit = len(eps.Records)
+	})
+
+	if epsErr == nil {
+		for _, e := range eps.Records {
+			out.Episodes = append(out.Episodes, missingEpisodeOut{
+				Series: e.Series.Title, Season: e.SeasonNumber, Episode: e.EpisodeNumber, Title: e.Title,
+			})
 		}
-		for _, e := range eps.Records[:limit] {
-			fmt.Printf("  %s %s S%02dE%02d — %s\n", ui.Err("○"), e.Series.Title, e.SeasonNumber, e.EpisodeNumber, e.Title)
-		}
-	} else {
-		fmt.Printf("  %s\n", ui.Err("Cannot reach Sonarr"))
 	}
-	fmt.Println()
+
+	ui.PrintOrJSON(out, func() {
+		ui.PrintBanner()
+		fmt.Println(ui.Bold("\n  Missing Content\n"))
+
+		if moviesErr == nil {
+			fmt.Println(ui.Bold(fmt.Sprintf("  Movies (%d missing)", len(out.Movies))))
+			for _, m := range out.Movies {
+				fmt.Printf("  %s %s (%d) — %s\n", ui.Err("○"), m.Title, m.Year, m.Status)
+			}
+		} else {
+			fmt.Printf("  %s\n", ui.Err("Cannot reach Radarr"))
+		}
+
+		fmt.Println()
+		if epsErr == nil {
+			fmt.Println(ui.Bold(fmt.Sprintf("  Episodes (%d missing)", eps.TotalRecords)))
+			limit := 15
+			if len(eps.Records) < limit {
+				limit = len(eps.Records)
+			}
+			for _, e := range eps.Records[:limit] {
+				fmt.Printf("  %s %s S%02dE%02d — %s\n", ui.Err("○"), e.Series.Title, e.SeasonNumber, e.EpisodeNumber, e.Title)
+			}
+		} else {
+			fmt.Printf("  %s\n", ui.Err("Cannot reach Sonarr"))
+		}
+		fmt.Println()
+	})
 }

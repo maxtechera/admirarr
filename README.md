@@ -6,228 +6,316 @@
     <img alt="Admirarr" src="assets/logo.svg" width="180">
   </picture>
   <br><br>
-  <a href="#install"><img src="https://img.shields.io/badge/install-one_liner-D4A843?style=for-the-badge" alt="Install"></a>
+  <a href="#quick-start"><img src="https://img.shields.io/badge/install-one_liner-D4A843?style=for-the-badge" alt="Install"></a>
+  &nbsp;
+  <img src="https://img.shields.io/badge/go-single_binary-00ADD8?style=for-the-badge&logo=go&logoColor=white" alt="Go">
+  &nbsp;
+  <a href="https://agentskills.io"><img src="https://img.shields.io/badge/Agent_Skills-compatible-D4A843?style=for-the-badge" alt="Agent Skills"></a>
   &nbsp;
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge" alt="License"></a>
-  &nbsp;
-  <img src="https://img.shields.io/badge/python-3.7+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python">
-  &nbsp;
-  <img src="https://img.shields.io/badge/deps-zero-2ECC71?style=for-the-badge" alt="Dependencies">
   <br><br>
-  <strong>A fast, zero-dependency CLI for managing your entire Plex + *Arr media server stack.<br>One command to rule the seven seas.</strong>
+  <strong>Command your fleet. The unified CLI for your *Arr stack — human and agent operated.</strong>
 </p>
 
 <br>
 
-<p align="center">
-  <img src="https://asciinema.org/a/YZ4Xqg6qsNuvMZpf.svg" alt="admirarr status demo" width="700">
-</p>
+## What is Admirarr?
+
+Deploy, wire, operate, and diagnose your Jellyfin/Plex + *Arr stack from one terminal. One binary, 26 commands, JSON output everywhere. Ships with a [`SKILL.md`](https://agentskills.io) following the Agent Skills open standard — so any AI agent on any platform can command your fleet too.
+
+- **`admirarr setup`** — zero to media server in 15 minutes
+- **`admirarr doctor`** — 15 diagnostic categories, 34 checks, AI-powered repair
+- **`admirarr status`** — your entire fleet at a glance
 
 <br>
 
-## Highlights
+## Quick Start
+
+```bash
+curl -fsSL https://get.admirarr.dev | sh
+admirarr setup      # deploy + wire the stack
+admirarr status     # see everything at a glance
+```
+
+```
+⚓ Fleet Status
+──────────────────────────────────────────────
+  Services     8/8 online
+  Movies       1,247 (1,189 with files)
+  Shows        86 (2,341 episodes)
+  Downloads    3 active — 42.1 MB/s
+  Disk         2.4 TB / 8.0 TB (30%)
+  Requests     2 pending
+──────────────────────────────────────────────
+```
+
+```
+⚓ Doctor — 15 categories, 34 checks
+──────────────────────────────────────────────
+  ✓ Connectivity      All 8 services reachable
+  ✓ API Keys          All keys valid
+  ✓ Containers        All running
+  ✓ Download Clients  qBittorrent connected
+  ✗ VPN               Gluetun tunnel down
+  ✓ Media Paths       All paths exist
+  ...
+──────────────────────────────────────────────
+  33 passed · 1 failed — run admirarr doctor --fix
+```
+
+<br>
+
+## Your Agent Already Knows Admirarr
+
+Admirarr ships a `SKILL.md` following the [Agent Skills](https://agentskills.io) open standard — the same spec used by 26+ platforms. Your agent reads it, discovers Admirarr's commands, and operates your stack.
+
+**Works with:** Claude Code, OpenClaw, OpenCode, Codex, Gemini CLI, Cursor, VS Code, Goose, Aider — and any future SKILL.md-compatible platform.
+
+### Install for your agent
 
 <table>
+<tr><th>Platform</th><th>Install command</th></tr>
 <tr>
-<td width="50%" valign="top">
+<td><strong>Any agent</strong> (universal)</td>
+<td>
 
-### Fleet Dashboard
-One command to see every service, library stat, queue, and disk — at a glance.
-
-```
-$ admirarr status
-```
-
-</td>
-<td width="50%" valign="top">
-
-### Ship Doctor + AI Fix Wizard
-Full diagnostics with auto-fix. Works with Claude Code, Aider, OpenCode, or Goose.
-
-```
-$ admirarr doctor --fix
+```bash
+npx skills add maxtechera/admirarr
 ```
 
 </td>
 </tr>
 <tr>
-<td width="50%" valign="top">
-
-### Search & Add
-Find and add movies or shows directly from the terminal. No browser needed.
+<td><strong>Claude Code</strong></td>
+<td>
 
 ```
-$ admirarr add-movie "interstellar"
+/plugin marketplace add maxtechera/admirarr
+/plugin install admirarr@admirarr
 ```
 
 </td>
-<td width="50%" valign="top">
+</tr>
+<tr>
+<td><strong>OpenClaw</strong></td>
+<td>
 
-### Download Watch
-Monitor qBittorrent torrents and Radarr/Sonarr import queues in real time.
+```bash
+clawdhub install admirarr
+```
 
-```
-$ admirarr downloads
-```
+</td>
+</tr>
+<tr>
+<td><strong>OpenCode</strong></td>
+<td>
+
+Auto-discovered — clone the repo and OpenCode reads `SKILL.md` and `AGENTS.md` natively.
+
+</td>
+</tr>
+<tr>
+<td><strong>Cursor / Copilot / Cline</strong></td>
+<td>
+
+Auto-discovered — `SKILL.md` and `AGENTS.md` at repo root are read natively.
 
 </td>
 </tr>
 </table>
+
+> Already installed Admirarr the CLI? Your agent picks up `SKILL.md` automatically — no extra step needed.
+
+### What ships in the box
+
+| File | What it does | Platforms |
+|---|---|---|
+| **`SKILL.md`** | Agent Skills standard — full command reference | All 26+ platforms |
+| **`AGENTS.md`** | Agent reference — commands, patterns, rules | OpenCode, Codex, Gemini CLI, Cursor, Copilot |
+| **3 Claude Code agents** | `doctor-fix` (Sonnet), `fleet-status` (Haiku), `content-search` (Haiku) | Claude Code, OpenCode |
+| **`.opencode/opencode.jsonc`** | Agents + commands config for OpenCode | OpenCode |
+| **`.claude-plugin/`** | Plugin marketplace for `/plugin install` | Claude Code |
+
+### `doctor --fix` — two-tier AI repair
+
+```
+"My downloads seem stuck"
+→ agent calls admirarr doctor -o json
+→ finds VPN down
+→ calls admirarr restart gluetun
+→ re-runs admirarr doctor to verify
+```
+
+Built-in fixes run first (container restarts, directory creation, VPN detection). Remaining issues get dispatched to whichever AI agent you have installed — auto-detected.
+
+### How it fits together
+
+```
+┌─────────────────────────────────────────────┐
+│           Any Agent Platform                 │
+│  Claude Code · OpenClaw · Codex · Cursor ... │
+└──────────────────┬──────────────────────────┘
+                   │ reads SKILL.md
+                   ▼
+┌─────────────────────────────────────────────┐
+│            ⚓ admirarr                       │
+│  One binary · JSON output · 26 commands     │
+└──────────────────┬──────────────────────────┘
+                   │
+                   ▼
+┌─────────────────────────────────────────────┐
+│           Your *Arr Stack                    │
+│  Jellyfin · Radarr · Sonarr · Prowlarr      │
+│  qBittorrent · Gluetun · Seerr · Bazarr     │
+└─────────────────────────────────────────────┘
+```
+
+<br>
+
+## Commands
+
+```bash
+admirarr status               # Fleet dashboard — services, libraries, queues, disk
+admirarr status --live         # Live-updating TUI
+admirarr doctor               # 15 diagnostic categories, 34 checks
+admirarr doctor --fix          # AI agent detects + fixes issues automatically
+admirarr setup                 # Deploy + wire the entire stack (12 phases)
+
+admirarr add-movie "Dune"     # Search → pick → add → downloading
+admirarr add-show "Severance" # Same for Sonarr
+admirarr search "4k remux"    # Search all Prowlarr indexers
+
+admirarr downloads            # Active torrents (+ pause/resume/remove)
+admirarr queue                # Import queues
+admirarr missing              # Monitored but not on disk
+admirarr movies / shows       # Library with file status
+admirarr recent / history     # Recently added / watch history
+admirarr requests             # Seerr requests
+
+admirarr indexers             # Indexer health (+ setup/add/remove/test/sync)
+admirarr recyclarr sync       # TRaSH Guide quality profiles
+admirarr health               # Service warnings
+admirarr disk                 # Storage breakdown
+admirarr restart <service>    # Restart a service
+admirarr logs <service>       # Tail logs
+admirarr scan                 # Library scan
+```
+
+Every command supports `-o json` for structured output.
+
+<br>
+
+## Diagnostic Engine
+
+15 categories, 34 checks — connectivity, API keys, containers, download clients, disk, media paths, root folders, quality config, indexers, health warnings, VPN, permissions, hardlinks, cross-service wiring, and recyclarr.
+
+```bash
+admirarr doctor               # Run all checks
+admirarr doctor --fix          # Built-in fixes → AI agent for the rest
+```
+
+Every failure includes an actionable fix. `--fix` runs deterministic repairs first (restart containers, create directories, detect VPN credentials), then dispatches remaining issues to your AI agent with full context.
+
+<br>
+
+## Setup
+
+```bash
+admirarr setup
+```
+
+12 phases: detect environment → select services → deploy via Docker Compose → connectivity check → API key discovery → download clients → root folders → Prowlarr wiring → Seerr wiring → Bazarr wiring → quality profiles → write config.
+
+Idempotent — run again anytime to converge. Detects existing services and wires what's missing.
+
+<br>
+
+## Supported Services
+
+10 default + 14 optional services.
+
+| Service | Role |
+|---|---|
+| **Jellyfin** | Media server |
+| **Radarr** / **Sonarr** | Movie + TV automation |
+| **Prowlarr** | Indexer management |
+| **qBittorrent** + **Gluetun** | Downloads behind VPN |
+| **Seerr** | Media requests |
+| **Bazarr** | Subtitles |
+| **FlareSolverr** | Cloudflare bypass |
+| **Profilarr** | TRaSH Guide quality profiles (GUI) |
+| **Watchtower** | Auto-updates |
+
+Want Plex instead? Setup asks. Don't want something? Skip it.
+
+<details>
+<summary><strong>Optional services</strong></summary>
+
+Plex, Lidarr, Readarr, Whisparr, SABnzbd, Autobrr, Unpackerr, Recyclarr, Tdarr, Tautulli, Jellystat, Notifiarr, Maintainerr
+
+</details>
+
+<br>
+
+## Why CLI + Agent Skills?
+
+- **CLIs compose** — agents call `admirarr status -o json`, not navigate web UIs
+- **SKILL.md is portable** — one file makes Admirarr work on 26+ agent platforms, no per-platform integration
+- **One binary, zero deps** — works in SSH, tmux, CI, agent sandboxes
+- **Already standard** — Agent Skills is the industry spec, adopted by Claude, OpenAI, Google, Microsoft, GitHub, and more. Admirarr uses what's already there.
+
+<br>
+
+## Why Another CLI?
+
+Your stack has 10+ services, each with its own API, web UI, and config format. No single tool manages all of them.
+
+### The *Arr ecosystem — what Admirarr manages
+
+| Service | What it does | What Admirarr does with it |
+|---------|-------------|---------------------------|
+| **Jellyfin** / **Plex** | Media server — streams your library | Libraries, watch history, recently added, library scans |
+| **Radarr** | Movie automation — monitors, grabs, imports | Search, add movies, queue, missing, quality profiles, health |
+| **Sonarr** | TV automation — same as Radarr for shows | Search, add shows, queue, missing, quality profiles, health |
+| **Prowlarr** | Indexer manager — searches torrent/usenet sites | Indexer status, add/remove/test/sync indexers |
+| **qBittorrent** | Download client — torrents behind VPN | Active downloads, pause/resume/remove, speed |
+| **Gluetun** | VPN container — routes downloads through VPN | VPN status, credential detection, restart |
+| **Seerr** | Request system — users request movies/shows | View requests, wiring to Radarr/Sonarr/Jellyfin |
+| **Bazarr** | Subtitles — auto-downloads subs for your library | Subtitle status, connectivity |
+| **Recyclarr** | Quality profiles — syncs TRaSH Guide configs | Sync, verify, instance management |
+| **FlareSolverr** | Cloudflare bypass for indexers | Connectivity check |
+| **Watchtower** | Auto-updates containers | Container status |
+| **+ 14 optional** | Lidarr (music), Readarr (books), Tdarr (transcoding), Tautulli (stats), etc. | Varies by service |
+
+### How tools compare
+
+| Tool | Services | Deploy | Configure | Diagnose | CLI/JSON | Agent Skills |
+|------|----------|--------|-----------|----------|----------|--------------|
+| Docker Compose | containers only | yes | — | — | — | — |
+| Recyclarr/Profilarr | Radarr, Sonarr | — | quality profiles | — | Recyclarr CLI | — |
+| Managarr | Radarr, Sonarr, misc | — | browse | — | — | — |
+| **Admirarr** | **all 10 + 14 optional** | yes | yes | 34 checks | yes | SKILL.md + 3 agents |
 
 <br>
 
 ## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/maxtechera/admirarr/main/install.sh | bash
+curl -fsSL https://get.admirarr.dev | sh
 ```
 
 <details>
-<summary><strong>More install options</strong></summary>
-
-#### Custom directory
+<summary><strong>Other methods</strong></summary>
 
 ```bash
-ADMIRARR_INSTALL_DIR=~/.local/bin curl -fsSL https://raw.githubusercontent.com/maxtechera/admirarr/main/install.sh | bash
+brew install maxtechera/tap/admirarr              # Homebrew
+go install github.com/maxtechera/admirarr@latest  # Go
+yay -S admirarr-bin                               # Arch AUR
+dpkg -i admirarr_*.deb                            # Debian/Ubuntu
+irm https://get.admirarr.dev/windows | iex        # Windows PowerShell
 ```
 
-#### Manual
-
-```bash
-curl -sL https://raw.githubusercontent.com/maxtechera/admirarr/main/admirarr -o admirarr
-chmod +x admirarr
-sudo mv admirarr /usr/local/bin/
-```
-
-#### Requirements
-
-- Python 3.7+
-- Your *Arr stack running on the same machine or reachable over the network
-- That's it. No pip, no venv, no node_modules.
-
 </details>
-
-<br>
-
-## Commands
-
-| Command | What it does |
-|---------|-------------|
-| `admirarr status` | Dashboard: services, library, queues, disk |
-| `admirarr doctor` | Run full diagnostics on your stack |
-| `admirarr doctor --fix` | Auto-fix issues with an AI agent (Claude Code, Aider, etc.) |
-| `admirarr health` | Health warnings from Radarr/Sonarr/Prowlarr |
-
-<details>
-<summary><strong>Library</strong></summary>
-
-| Command | What it does |
-|---------|-------------|
-| `admirarr movies` | List all movies in Radarr |
-| `admirarr shows` | List all TV shows in Sonarr |
-| `admirarr missing` | Monitored content without files |
-| `admirarr recent` | Recently added to Plex |
-| `admirarr history` | Tautulli watch history |
-
-</details>
-
-<details>
-<summary><strong>Search & Add</strong></summary>
-
-| Command | What it does |
-|---------|-------------|
-| `admirarr search <query>` | Search Prowlarr indexers |
-| `admirarr find <query>` | Search Radarr releases for a movie |
-| `admirarr add-movie <query>` | Search and add a movie to Radarr |
-| `admirarr add-show <query>` | Search and add a TV show to Sonarr |
-
-</details>
-
-<details>
-<summary><strong>Downloads</strong></summary>
-
-| Command | What it does |
-|---------|-------------|
-| `admirarr downloads` | Active qBittorrent torrents |
-| `admirarr queue` | Radarr + Sonarr import queues |
-
-</details>
-
-<details>
-<summary><strong>Infrastructure</strong></summary>
-
-| Command | What it does |
-|---------|-------------|
-| `admirarr indexers` | Prowlarr indexer status |
-| `admirarr scan` | Trigger Plex library scan |
-| `admirarr restart <svc>` | Restart a service |
-| `admirarr docker` | Docker container status |
-| `admirarr disk` | Disk space breakdown |
-| `admirarr logs <svc>` | Recent logs (sonarr\|radarr) |
-
-</details>
-
-<br>
-
-## Supported Services
-
-<table>
-<tr>
-<td align="center" width="100"><strong>Plex</strong><br><sub>Media Server</sub></td>
-<td align="center" width="100"><strong>Radarr</strong><br><sub>Movies</sub></td>
-<td align="center" width="100"><strong>Sonarr</strong><br><sub>TV Shows</sub></td>
-<td align="center" width="100"><strong>Prowlarr</strong><br><sub>Indexers</sub></td>
-<td align="center" width="100"><strong>qBittorrent</strong><br><sub>Downloads</sub></td>
-</tr>
-<tr>
-<td align="center" width="100"><strong>Tautulli</strong><br><sub>Analytics</sub></td>
-<td align="center" width="100"><strong>Seerr</strong><br><sub>Requests</sub></td>
-<td align="center" width="100"><strong>Bazarr</strong><br><sub>Subtitles</sub></td>
-<td align="center" width="100"><strong>Organizr</strong><br><sub>Dashboard</sub></td>
-<td align="center" width="100"><strong>FlareSolverr</strong><br><sub>CF Bypass</sub></td>
-</tr>
-</table>
-
-Works with both **Windows services** and **Docker containers**. Runs from Linux, macOS, or WSL.
-
-<br>
-
-## Configuration
-
-Admirarr reads API keys directly from your \*Arr config files — **zero manual setup** if running on the same machine or WSL.
-
-```python
-WIN_HOST = "192.168.50.42"  # Edit this to match your server IP
-```
-
-<details>
-<summary><strong>API key sources</strong></summary>
-
-| Service | Config Path |
-|---------|------------|
-| Sonarr | `/mnt/c/ProgramData/Sonarr/config.xml` |
-| Radarr | `/mnt/c/ProgramData/Radarr/config.xml` |
-| Prowlarr | `/mnt/c/ProgramData/Prowlarr/config.xml` |
-| Plex | `Preferences.xml` (auto-detected) |
-| Tautulli | `/mnt/c/ProgramData/Tautulli/config.ini` |
-| Seerr | Read from Docker container |
-
-</details>
-
-<br>
-
-## How It Works
-
-A single Python file (~900 lines), zero external dependencies:
-
-```
-urllib.request     HTTP/API calls
-xml.etree          Plex XML parsing
-subprocess         Docker & Windows service management
-ANSI escapes       Colored terminal output (NO_COLOR supported)
-```
-
-No pip. No venv. No node_modules. Just Python 3.7+ and your \*Arr stack.
 
 <br>
 
@@ -235,8 +323,7 @@ No pip. No venv. No node_modules. Just Python 3.7+ and your \*Arr stack.
 
 ```bash
 git clone https://github.com/maxtechera/admirarr.git
-cd admirarr
-python3 test_admirarr.py   # Run tests
+cd admirarr && go build -o admirarr . && go test ./...
 ```
 
 <br>
@@ -248,5 +335,5 @@ python3 test_admirarr.py   # Run tests
 ---
 
 <p align="center">
-  <sub>Built with <img src="assets/icon.svg" width="16" height="16" style="vertical-align: middle;"> by <a href="https://github.com/maxtechera">maxtechera</a></sub>
+  <sub>Built with ⚓ by <a href="https://github.com/maxtechera">maxtechera</a></sub>
 </p>

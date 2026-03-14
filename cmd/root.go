@@ -11,12 +11,12 @@ import (
 
 var rootCmd = &cobra.Command{
 	Use:   "admirarr",
-	Short: "Command your fleet — manage your Plex + *Arr media server stack",
+	Short: "Command your fleet — manage your Jellyfin + *Arr media server stack",
 	Long: fmt.Sprintf(`%s %s %s    %s
 
-Admirarr is a CLI for managing your Plex + *Arr media server stack.
+Admirarr is a CLI for managing your Jellyfin + *Arr media server stack.
 It provides dashboard views, diagnostics, search, and management commands
-for Plex, Radarr, Sonarr, Prowlarr, qBittorrent, Tautulli, and more.`,
+for Jellyfin, Radarr, Sonarr, Prowlarr, qBittorrent, and more.`,
 		ui.GoldText("⚓"), ui.Bold("ADMIRARR"), ui.Dim("v"+ui.Version), ui.Dim("Command your fleet.")),
 	Version: ui.Version,
 	Run: func(cmd *cobra.Command, args []string) {
@@ -35,6 +35,7 @@ func Execute() {
 }
 
 func init() {
+	rootCmd.PersistentFlags().StringVarP(&ui.OutputFormat, "output", "o", "text", "Output format: text or json")
 	rootCmd.SetVersionTemplate(fmt.Sprintf("admirarr v%s\n", ui.Version))
 	rootCmd.CompletionOptions.HiddenDefaultCmd = true
 }

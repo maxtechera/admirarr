@@ -1,0 +1,21 @@
+{
+  "name": "admirarr",
+  "owner": {
+    "name": "Max Techera",
+    "email": "max@maxtechera.com"
+  },
+  "metadata": {
+    "description": "Admirarr — command your fleet from any AI agent"
+  },
+  "plugins": [
+    {
+      "name": "admirarr",
+      "source": ".",
+      "description": "Manage a Jellyfin/Plex + *Arr media server stack — status, diagnostics, content, downloads",
+      "version": "1.0.0",
+      "category": "homelab",
+      "tags": ["media-server", "arr", "jellyfin", "plex", "homelab"],
+      "keywords": ["homelab", "media-server", "arr", "jellyfin", "plex", "sonarr", "radarr"]
+    }
+  ]
+}

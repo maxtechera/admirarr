@@ -1,0 +1,19 @@
+{
+  "name": "admirarr",
+  "description": "Manage a Jellyfin/Plex + *Arr media server stack — check status, add content, monitor downloads, diagnose issues, restart services",
+  "version": "1.0.0",
+  "author": {
+    "name": "Max Techera",
+    "email": "max@maxtechera.com"
+  },
+  "homepage": "https://github.com/maxtechera/admirarr",
+  "repository": "https://github.com/maxtechera/admirarr",
+  "license": "MIT",
+  "keywords": ["homelab", "media-server", "arr", "jellyfin", "plex", "sonarr", "radarr"],
+  "agents": [
+    ".claude/agents/doctor-fix.md",
+    ".claude/agents/fleet-status.md",
+    ".claude/agents/content-search.md"
+  ],
+  "strict": false
+}

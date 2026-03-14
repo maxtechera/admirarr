@@ -3,9 +3,8 @@ package cmd
 import (
 	"fmt"
 	"strings"
-	"time"
 
-	"github.com/maxtechera/admirarr/internal/api"
+	"github.com/maxtechera/admirarr/internal/arr"
 	"github.com/maxtechera/admirarr/internal/ui"
 	"github.com/spf13/cobra"
 )
@@ -32,22 +31,21 @@ func init() {
 
 func runFind(cmd *cobra.Command, args []string) {
 	query := strings.ToLower(strings.Join(args, " "))
-	ui.PrintBanner()
-	fmt.Printf("%s\n", ui.Bold(fmt.Sprintf("\n  Radarr Interactive Search: %s\n", query)))
 
-	var movies []struct {
-		ID    int    `json:"id"`
-		Title string `json:"title"`
-	}
-	if err := api.GetJSON("radarr", "api/v3/movie", nil, &movies); err != nil {
-		fmt.Printf("  %s\n", ui.Err("Cannot reach Radarr"))
+	client := arr.New("radarr")
+	movies, err := client.Movies()
+	if err != nil {
+		if ui.IsJSON() {
+			ui.PrintJSON(map[string]string{"error": "Cannot reach Radarr"})
+		} else {
+			ui.PrintBanner()
+			fmt.Printf("%s\n", ui.Bold(fmt.Sprintf("\n  Radarr Interactive Search: %s\n", query)))
+			fmt.Printf("  %s\n", ui.Err("Cannot reach Radarr"))
+		}
 		return
 	}
 
-	var match *struct {
-		ID    int    `json:"id"`
-		Title string `json:"title"`
-	}
+	var match *arr.Movie
 	for i, m := range movies {
 		if strings.Contains(strings.ToLower(m.Title), query) {
 			match = &movies[i]
@@ -55,55 +53,74 @@ func runFind(cmd *cobra.Command, args []string) {
 		}
 	}
 	if match == nil {
-		fmt.Printf("  %s\n", ui.Err(fmt.Sprintf("Movie not found in Radarr: %s", query)))
+		if ui.IsJSON() {
+			ui.PrintJSON(map[string]string{"error": fmt.Sprintf("Movie not found in Radarr: %s", query)})
+		} else {
+			ui.PrintBanner()
+			fmt.Printf("%s\n", ui.Bold(fmt.Sprintf("\n  Radarr Interactive Search: %s\n", query)))
+			fmt.Printf("  %s\n", ui.Err(fmt.Sprintf("Movie not found in Radarr: %s", query)))
+		}
 		return
 	}
 
-	fmt.Printf("  Searching releases for: %s (ID: %d)\n", ui.Bold(match.Title), match.ID)
+	releases, err := client.Releases(match.ID)
+	if err != nil || len(releases) == 0 {
+		if ui.IsJSON() {
+			ui.PrintJSON([]struct{}{})
+		} else {
+			ui.PrintBanner()
+			fmt.Printf("%s\n", ui.Bold(fmt.Sprintf("\n  Radarr Interactive Search: %s\n", query)))
+			fmt.Printf("  Searching releases for: %s (ID: %d)\n", ui.Bold(match.Title), match.ID)
+			fmt.Printf("  %s\n", ui.Err("No releases found"))
+		}
+		return
+	}
 
-	var releases []struct {
+	type releaseOut struct {
 		Title    string `json:"title"`
+		Quality  string `json:"quality"`
 		Size     int64  `json:"size"`
 		Seeders  int    `json:"seeders"`
 		Rejected bool   `json:"rejected"`
-		Quality  struct {
-			Quality struct {
-				Name string `json:"name"`
-			} `json:"quality"`
-		} `json:"quality"`
-		Rejections []string `json:"rejections"`
 	}
-	params := map[string]string{"movieId": fmt.Sprintf("%d", match.ID)}
-	if err := api.GetJSON("radarr", "api/v3/release", params, &releases, 30*time.Second); err != nil || len(releases) == 0 {
-		fmt.Printf("  %s\n", ui.Err("No releases found"))
-		return
+	var out []releaseOut
+	for _, r := range releases {
+		out = append(out, releaseOut{
+			Title: r.Title, Quality: r.Quality.Quality.Name,
+			Size: r.Size, Seeders: r.Seeders, Rejected: r.Rejected,
+		})
 	}
 
-	limit := 10
-	if len(releases) < limit {
-		limit = len(releases)
-	}
-	for i, r := range releases[:limit] {
-		title := r.Title
-		if len(title) > 65 {
-			title = title[:65]
+	ui.PrintOrJSON(out, func() {
+		ui.PrintBanner()
+		fmt.Printf("%s\n", ui.Bold(fmt.Sprintf("\n  Radarr Interactive Search: %s\n", query)))
+		fmt.Printf("  Searching releases for: %s (ID: %d)\n", ui.Bold(match.Title), match.ID)
+		limit := 10
+		if len(releases) < limit {
+			limit = len(releases)
 		}
-		status := ui.Ok("OK")
-		if r.Rejected {
-			status = ui.Err("REJECTED")
-		}
-		quality := r.Quality.Quality.Name
-		size := ui.FmtSize(r.Size)
-		fmt.Printf("  %s %s %s\n", ui.Dim(fmt.Sprintf("%2d.", i+1)), status, title)
-		fmt.Printf("      %s | %s | Seeds: %d\n", quality, size, r.Seeders)
-		if r.Rejected && len(r.Rejections) > 0 {
-			for j, rej := range r.Rejections {
-				if j >= 2 {
-					break
+		for i, r := range releases[:limit] {
+			title := r.Title
+			if len(title) > 65 {
+				title = title[:65]
+			}
+			status := ui.Ok("OK")
+			if r.Rejected {
+				status = ui.Err("REJECTED")
+			}
+			quality := r.Quality.Quality.Name
+			size := ui.FmtSize(r.Size)
+			fmt.Printf("  %s %s %s\n", ui.Dim(fmt.Sprintf("%2d.", i+1)), status, title)
+			fmt.Printf("      %s | %s | Seeds: %d\n", quality, size, r.Seeders)
+			if r.Rejected && len(r.Rejections) > 0 {
+				for j, rej := range r.Rejections {
+					if j >= 2 {
+						break
+					}
+					fmt.Printf("      %s\n", ui.Warn(rej))
 				}
-				fmt.Printf("      %s\n", ui.Warn(rej))
 			}
 		}
-	}
-	fmt.Println()
+		fmt.Println()
+	})
 }

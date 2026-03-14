@@ -1,10 +1,7 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -12,7 +9,11 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/maxtechera/admirarr/internal/api"
+	"github.com/maxtechera/admirarr/internal/arr"
 	"github.com/maxtechera/admirarr/internal/config"
+	"github.com/maxtechera/admirarr/internal/qbit"
+	"github.com/maxtechera/admirarr/internal/sabnzbd"
+	"github.com/maxtechera/admirarr/internal/seerr"
 	"github.com/maxtechera/admirarr/internal/ui"
 )
 
@@ -26,33 +27,42 @@ type serviceResult struct {
 	Ms   int64
 }
 
-type moviesResult struct {
-	Movies []movieInfo
+type arrLibraryResult struct {
+	Data arrLibraryData
+}
+
+type jellyfinCountsResult struct {
+	Counts *jellyfinItemCounts
 	Err    bool
 }
 
-type seriesResult struct {
-	Series []seriesInfo
+type plexCountsResult struct {
+	Counts *plexLibraryCounts
 	Err    bool
 }
 
 type healthResult struct {
-	Items []healthItem
+	Items []statusHealthItem
 }
 
 type queueResult struct {
 	Svc     string
 	Total   int
-	Records []queueRecord
+	Records []arr.QueueRecord
 }
 
 type torrentsResult struct {
-	Torrents []torrentInfo
+	Torrents []qbit.Torrent
 	Err      bool
 }
 
+type sabnzbdResult struct {
+	Queue *sabnzbd.QueueResponse
+	Err   bool
+}
+
 type seerrResult struct {
-	Requests []seerrRequest
+	Requests []seerr.Request
 	Total    int
 	Titles   map[int]titleInfo // tmdbID -> title
 	Err      bool
@@ -64,7 +74,12 @@ type titleInfo struct {
 }
 
 type commandsResult struct {
-	Commands []commandInfo
+	Commands []statusCommandInfo
+}
+
+type indexersResult struct {
+	Indexers []statusIndexer
+	Err      bool
 }
 
 type diskResult struct {
@@ -80,16 +95,18 @@ type tuiModel struct {
 	height int
 
 	// Data
-	services      map[string]serviceResult
-	movies        *moviesResult
-	series        *seriesResult
-	health        *healthResult
-	radarrQueue   *queueResult
-	sonarrQueue   *queueResult
-	torrents      *torrentsResult
-	seerr         *seerrResult
-	commands      *commandsResult
-	disk          *diskResult
+	services       map[string]serviceResult
+	arrLibrary     []arrLibraryData
+	jellyfinCounts *jellyfinCountsResult
+	plexCounts     *plexCountsResult
+	health         *healthResult
+	arrQueues      map[string]*queueResult
+	torrents       *torrentsResult
+	sabnzbdData    *sabnzbdResult
+	seerr          *seerrResult
+	commands       *commandsResult
+	indexers       *indexersResult
+	disk           *diskResult
 
 	// State
 	loading    bool
@@ -100,8 +117,9 @@ type tuiModel struct {
 
 func newTuiModel() tuiModel {
 	return tuiModel{
-		services: make(map[string]serviceResult),
-		loading:  true,
+		services:  make(map[string]serviceResult),
+		arrQueues: make(map[string]*queueResult),
+		loading:   true,
 	}
 }
 
@@ -134,6 +152,10 @@ func fetchAll() tea.Cmd {
 
 		// Services
 		for _, name := range config.AllServiceNames() {
+			def, _ := config.GetServiceDef(name)
+			if def.Port == 0 {
+				continue
+			}
 			wg.Add(1)
 			go func(n string) {
 				defer wg.Done()
@@ -144,132 +166,216 @@ func fetchAll() tea.Cmd {
 			}(name)
 		}
 
-		// Movies
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			var movies []movieInfo
-			err := api.GetJSON("radarr", "api/v3/movie", nil, &movies)
-			addMsg(moviesResult{Movies: movies, Err: err != nil})
-		}()
-
-		// Series
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			var series []seriesInfo
-			err := api.GetJSON("sonarr", "api/v3/series", nil, &series)
-			addMsg(seriesResult{Series: series, Err: err != nil})
-		}()
-
-		// Health
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			var items []healthItem
-			for _, svc := range []string{"radarr", "sonarr", "prowlarr"} {
-				ver := config.ServiceAPIVer(svc)
-				var h []healthItem
-				if api.GetJSON(svc, fmt.Sprintf("api/%s/health", ver), nil, &h) == nil {
-					for i := range h {
-						h[i].Svc = svc
-					}
-					items = append(items, h...)
-				}
+		// Dynamic *arr loop
+		for _, name := range config.AllServiceNames() {
+			def, ok := config.GetServiceDef(name)
+			if !ok || def.APIVer == "" {
+				continue
 			}
-			addMsg(healthResult{Items: items})
+			svcName := name
+			client := arr.New(svcName)
+
+			// Health
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				items, err := client.Health()
+				if err != nil {
+					return
+				}
+				var tagged []statusHealthItem
+				for _, item := range items {
+					tagged = append(tagged, statusHealthItem{Svc: svcName, Type: item.Type, Message: item.Message})
+				}
+				addMsg(healthResult{Items: tagged})
+			}()
+
+			// Queues + Commands (all except prowlarr)
+			if svcName != "prowlarr" {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					page, _ := client.Queue(10)
+					if page != nil {
+						addMsg(queueResult{Svc: svcName, Total: page.TotalRecords, Records: page.Records})
+					} else {
+						addMsg(queueResult{Svc: svcName})
+					}
+				}()
+
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					cmds, err := client.Commands()
+					if err == nil {
+						var tagged []statusCommandInfo
+						for _, c := range cmds {
+							tagged = append(tagged, statusCommandInfo{Svc: svcName, Name: c.Name, Status: c.Status})
+						}
+						addMsg(commandsResult{Commands: tagged})
+					}
+				}()
+			}
+
+			// Library stats
+			switch svcName {
+			case "radarr", "whisparr":
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					movies, err := client.Movies()
+					lib := arrLibraryData{Service: svcName, Label: arrLibraryLabel[svcName]}
+					if err != nil {
+						lib.Err = true
+					} else {
+						lib.Total = len(movies)
+						for _, m := range movies {
+							if m.HasFile {
+								lib.OnDisk++
+							}
+							if m.Monitored && !m.HasFile {
+								lib.Missing++
+							}
+							lib.Size += m.SizeOnDisk
+						}
+					}
+					addMsg(arrLibraryResult{Data: lib})
+				}()
+			case "sonarr":
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					series, err := client.Series()
+					lib := arrLibraryData{Service: svcName, Label: "TV Shows", SubLabel: "episodes"}
+					if err != nil {
+						lib.Err = true
+					} else {
+						lib.Total = len(series)
+						for _, s := range series {
+							lib.SubTotal += s.Statistics.EpisodeCount
+							lib.SubHave += s.Statistics.EpisodeFileCount
+							lib.Size += s.Statistics.SizeOnDisk
+						}
+					}
+					addMsg(arrLibraryResult{Data: lib})
+				}()
+			case "lidarr":
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					artists, err := client.Artists()
+					lib := arrLibraryData{Service: svcName, Label: "Music", SubLabel: "tracks"}
+					if err != nil {
+						lib.Err = true
+					} else {
+						lib.Total = len(artists)
+						for _, a := range artists {
+							lib.SubTotal += a.Statistics.TrackCount
+							lib.SubHave += a.Statistics.TrackFileCount
+							lib.Size += a.Statistics.SizeOnDisk
+						}
+					}
+					addMsg(arrLibraryResult{Data: lib})
+				}()
+			case "readarr":
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					authors, err := client.Authors()
+					lib := arrLibraryData{Service: svcName, Label: "Books", SubLabel: "books"}
+					if err != nil {
+						lib.Err = true
+					} else {
+						lib.Total = len(authors)
+						for _, a := range authors {
+							lib.SubTotal += a.Statistics.BookCount
+							lib.SubHave += a.Statistics.BookFileCount
+							lib.Size += a.Statistics.SizeOnDisk
+						}
+					}
+					addMsg(arrLibraryResult{Data: lib})
+				}()
+			case "prowlarr":
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					indexers, err := client.Indexers()
+					var idxs []statusIndexer
+					if err == nil {
+						for _, idx := range indexers {
+							idxs = append(idxs, statusIndexer{Name: idx.Name, Enable: idx.Enable})
+						}
+					}
+					addMsg(indexersResult{Indexers: idxs, Err: err != nil})
+				}()
+			}
+		}
+
+		// Jellyfin counts
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			var counts jellyfinItemCounts
+			err := api.GetJSON("jellyfin", "Items/Counts", nil, &counts)
+			addMsg(jellyfinCountsResult{Counts: &counts, Err: err != nil})
 		}()
 
-		// Queues
-		for _, svc := range []string{"radarr", "sonarr"} {
-			wg.Add(1)
-			go func(s string) {
-				defer wg.Done()
-				ver := config.ServiceAPIVer(s)
-				var raw struct {
-					TotalRecords int           `json:"totalRecords"`
-					Records      []queueRecord `json:"records"`
-				}
-				api.GetJSON(s, fmt.Sprintf("api/%s/queue", ver), map[string]string{"pageSize": "10"}, &raw)
-				addMsg(queueResult{Svc: s, Total: raw.TotalRecords, Records: raw.Records})
-			}(svc)
-		}
+		// Plex counts
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			counts, err := fetchPlexCounts()
+			addMsg(plexCountsResult{Counts: counts, Err: err != nil})
+		}()
 
 		// Torrents
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			url := fmt.Sprintf("%s/api/v2/torrents/info", config.ServiceURL("qbittorrent"))
-			c := &http.Client{Timeout: 3 * time.Second}
-			resp, err := c.Get(url)
-			if err != nil {
-				addMsg(torrentsResult{Err: true})
-				return
-			}
-			defer resp.Body.Close()
-			body, _ := io.ReadAll(resp.Body)
-			var t []torrentInfo
-			if json.Unmarshal(body, &t) != nil {
-				addMsg(torrentsResult{Err: true})
-				return
-			}
-			addMsg(torrentsResult{Torrents: t})
+			torrents, err := qbit.New().Torrents()
+			addMsg(torrentsResult{Torrents: torrents, Err: err != nil})
+		}()
+
+		// SABnzbd
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			q, err := sabnzbd.New().Queue()
+			addMsg(sabnzbdResult{Queue: q, Err: err != nil})
 		}()
 
 		// Seerr
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			var raw struct {
-				PageInfo struct {
-					Results int `json:"results"`
-				} `json:"pageInfo"`
-				Results []seerrRequest `json:"results"`
-			}
-			if api.GetJSON("seerr", "api/v1/request", map[string]string{"take": "8", "sort": "added"}, &raw) != nil {
+			client := seerr.New()
+			page, err := client.Requests(8)
+			if err != nil {
 				addMsg(seerrResult{Err: true})
 				return
 			}
-			// Resolve titles in parallel
 			titles := make(map[int]titleInfo)
 			var tmu sync.Mutex
 			var twg sync.WaitGroup
-			for _, r := range raw.Results {
+			for _, r := range page.Results {
 				twg.Add(1)
 				go func(mediaType string, tmdbID int) {
 					defer twg.Done()
-					t, y := resolveTitle(mediaType, tmdbID)
+					t, y := client.ResolveTitle(mediaType, tmdbID)
 					tmu.Lock()
 					titles[tmdbID] = titleInfo{Title: t, Year: y}
 					tmu.Unlock()
 				}(r.Media.MediaType, r.Media.TmdbID)
 			}
 			twg.Wait()
-			addMsg(seerrResult{Requests: raw.Results, Total: raw.PageInfo.Results, Titles: titles})
-		}()
-
-		// Commands
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			var all []commandInfo
-			for _, svc := range []string{"radarr", "sonarr"} {
-				var cmds []commandInfo
-				if api.GetJSON(svc, fmt.Sprintf("api/%s/command", config.ServiceAPIVer(svc)), nil, &cmds) == nil {
-					for i := range cmds {
-						cmds[i].Svc = svc
-					}
-					all = append(all, cmds...)
-				}
-			}
-			addMsg(commandsResult{Commands: all})
+			addMsg(seerrResult{Requests: page.Results, Total: page.PageInfo.Results, Titles: titles})
 		}()
 
 		// Disk
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			total, free, err := getStatfs(config.MediaPathWSL())
+			total, free, err := getStatfs(config.DataPath())
 			addMsg(diskResult{Total: total, Free: free, Err: err != nil})
 		}()
 
@@ -313,33 +419,65 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.loading = false
 		m.lastUpdate = time.Now()
+		// Sort library after all results are in
+		sortTuiLibrary(&m)
 		return m, tea.Batch(cmds...)
 
 	case serviceResult:
 		m.services[msg.Name] = msg
-	case moviesResult:
-		m.movies = &msg
-	case seriesResult:
-		m.series = &msg
-	case healthResult:
-		m.health = &msg
-	case queueResult:
-		if msg.Svc == "radarr" {
-			m.radarrQueue = &msg
-		} else {
-			m.sonarrQueue = &msg
+	case arrLibraryResult:
+		// Replace existing entry for this service or append
+		found := false
+		for i, lib := range m.arrLibrary {
+			if lib.Service == msg.Data.Service {
+				m.arrLibrary[i] = msg.Data
+				found = true
+				break
+			}
 		}
+		if !found {
+			m.arrLibrary = append(m.arrLibrary, msg.Data)
+		}
+	case jellyfinCountsResult:
+		m.jellyfinCounts = &msg
+	case plexCountsResult:
+		m.plexCounts = &msg
+	case healthResult:
+		if m.health == nil {
+			m.health = &healthResult{}
+		}
+		m.health.Items = append(m.health.Items, msg.Items...)
+	case queueResult:
+		m.arrQueues[msg.Svc] = &msg
 	case torrentsResult:
 		m.torrents = &msg
+	case sabnzbdResult:
+		m.sabnzbdData = &msg
 	case seerrResult:
 		m.seerr = &msg
 	case commandsResult:
-		m.commands = &msg
+		if m.commands == nil {
+			m.commands = &commandsResult{}
+		}
+		m.commands.Commands = append(m.commands.Commands, msg.Commands...)
+	case indexersResult:
+		m.indexers = &msg
 	case diskResult:
 		m.disk = &msg
 	}
 
 	return m, nil
+}
+
+func sortTuiLibrary(m *tuiModel) {
+	order := map[string]int{"radarr": 0, "sonarr": 1, "lidarr": 2, "readarr": 3, "whisparr": 4}
+	for i := 0; i < len(m.arrLibrary); i++ {
+		for j := i + 1; j < len(m.arrLibrary); j++ {
+			if order[m.arrLibrary[i].Service] > order[m.arrLibrary[j].Service] {
+				m.arrLibrary[i], m.arrLibrary[j] = m.arrLibrary[j], m.arrLibrary[i]
+			}
+		}
+	}
 }
 
 func (m tuiModel) View() string {
@@ -370,45 +508,102 @@ func (m tuiModel) View() string {
 	// Fleet
 	b.WriteString(fmt.Sprintf("\n  %s\n", ui.Bold("Fleet")))
 	names := config.AllServiceNames()
-	// Render 2 columns
-	for i := 0; i < len(names); i += 2 {
-		left := renderServiceCell(m.services, names[i])
+	var displayNames []string
+	for _, n := range names {
+		def, _ := config.GetServiceDef(n)
+		if def.Port > 0 {
+			displayNames = append(displayNames, n)
+		}
+	}
+	for i := 0; i < len(displayNames); i += 2 {
+		left := renderServiceCell(m.services, displayNames[i])
 		right := ""
-		if i+1 < len(names) {
-			right = renderServiceCell(m.services, names[i+1])
+		if i+1 < len(displayNames) {
+			right = renderServiceCell(m.services, displayNames[i+1])
 		}
 		b.WriteString(fmt.Sprintf("  %-38s%s\n", left, right))
 	}
 
+	// Indexers
+	b.WriteString(fmt.Sprintf("\n  %s\n", ui.Bold("Indexers")))
+	if m.indexers != nil && !m.indexers.Err {
+		configuredNames := make(map[string]bool)
+		enabled, disabled := 0, 0
+		for _, idx := range m.indexers.Indexers {
+			configuredNames[strings.ToLower(idx.Name)] = true
+			if idx.Enable {
+				enabled++
+			} else {
+				disabled++
+			}
+		}
+		var missing []string
+		for _, rec := range recommendedIndexers {
+			if !configuredNames[strings.ToLower(rec.Name)] {
+				missing = append(missing, rec.Name)
+			}
+		}
+		have := len(recommendedIndexers) - len(missing)
+		total := len(recommendedIndexers)
+		if len(missing) == 0 {
+			b.WriteString(fmt.Sprintf("  %s %d/%d recommended\n", ui.Ok("✓"), have, total))
+		} else {
+			b.WriteString(fmt.Sprintf("  %s %d/%d recommended — missing: %s\n",
+				ui.Warn("⚠"), have, total, strings.Join(missing, ", ")))
+		}
+		summary := fmt.Sprintf("%d configured, %d enabled", len(m.indexers.Indexers), enabled)
+		if disabled > 0 {
+			summary += fmt.Sprintf(", %d disabled", disabled)
+		}
+		b.WriteString(fmt.Sprintf("  %s\n", ui.Dim(summary)))
+	} else {
+		b.WriteString(fmt.Sprintf("  %s\n", ui.Dim("…")))
+	}
+
 	// Library
 	b.WriteString(fmt.Sprintf("\n  %s\n", ui.Bold("Library")))
-	if m.movies != nil && !m.movies.Err {
-		have, missing := 0, 0
-		var sz int64
-		for _, mv := range m.movies.Movies {
-			if mv.HasFile { have++ }
-			if mv.Monitored && !mv.HasFile { missing++ }
-			sz += mv.SizeOnDisk
-		}
-		missStr := ui.Ok("0 missing")
-		if missing > 0 { missStr = ui.Err(fmt.Sprintf("%d missing", missing)) }
-		b.WriteString(fmt.Sprintf("  %s     %d total, %s, %s  %s\n",
-			ui.GoldText("Movies"), len(m.movies.Movies), ui.Ok(fmt.Sprintf("%d on disk", have)), missStr, ui.Dim(ui.FmtSize(sz))))
-	} else {
-		b.WriteString(fmt.Sprintf("  %s     %s\n", ui.GoldText("Movies"), ui.Dim("…")))
+
+	// Media server counts
+	if m.jellyfinCounts != nil && !m.jellyfinCounts.Err {
+		c := m.jellyfinCounts.Counts
+		b.WriteString(fmt.Sprintf("  %s  %d movies, %d series, %d episodes\n",
+			ui.GoldText("Jellyfin"), c.MovieCount, c.SeriesCount, c.EpisodeCount))
 	}
-	if m.series != nil && !m.series.Err {
-		te, he := 0, 0
-		var sz int64
-		for _, s := range m.series.Series {
-			te += s.Stats.EpisodeCount
-			he += s.Stats.EpisodeFileCount
-			sz += s.Stats.SizeOnDisk
+	if m.plexCounts != nil && !m.plexCounts.Err && m.plexCounts.Counts != nil {
+		pc := m.plexCounts.Counts
+		var parts []string
+		if pc.Movies > 0 {
+			parts = append(parts, fmt.Sprintf("%d movies", pc.Movies))
 		}
-		b.WriteString(fmt.Sprintf("  %s   %d shows, %s  %s\n",
-			ui.GoldText("TV Shows"), len(m.series.Series), ui.Ok(fmt.Sprintf("%d/%d episodes", he, te)), ui.Dim(ui.FmtSize(sz))))
-	} else {
-		b.WriteString(fmt.Sprintf("  %s   %s\n", ui.GoldText("TV Shows"), ui.Dim("…")))
+		if pc.Shows > 0 {
+			parts = append(parts, fmt.Sprintf("%d shows", pc.Shows))
+		}
+		if len(parts) > 0 {
+			b.WriteString(fmt.Sprintf("  %s      %s\n", ui.GoldText("Plex"), strings.Join(parts, ", ")))
+		}
+	}
+
+	// Dynamic *arr library
+	for _, lib := range m.arrLibrary {
+		if lib.Err {
+			b.WriteString(fmt.Sprintf("  %-10s %s\n", ui.GoldText(lib.Label), ui.Dim("…")))
+			continue
+		}
+		if lib.SubLabel != "" {
+			b.WriteString(fmt.Sprintf("  %-10s %d total, %s  %s\n",
+				ui.GoldText(lib.Label), lib.Total,
+				ui.Ok(fmt.Sprintf("%d/%d %s", lib.SubHave, lib.SubTotal, lib.SubLabel)),
+				ui.Dim(ui.FmtSize(lib.Size))))
+		} else {
+			missStr := ui.Ok("0 missing")
+			if lib.Missing > 0 {
+				missStr = ui.Err(fmt.Sprintf("%d missing", lib.Missing))
+			}
+			b.WriteString(fmt.Sprintf("  %-10s %d total, %s, %s  %s\n",
+				ui.GoldText(lib.Label), lib.Total,
+				ui.Ok(fmt.Sprintf("%d on disk", lib.OnDisk)), missStr,
+				ui.Dim(ui.FmtSize(lib.Size))))
+		}
 	}
 
 	// Requests
@@ -417,24 +612,36 @@ func (m tuiModel) View() string {
 		for _, r := range m.seerr.Requests {
 			ti := m.seerr.Titles[r.Media.TmdbID]
 			title := ti.Title
-			if title == "" { title = "…" }
-			if len(title) > 40 { title = title[:40] + "…" }
+			if title == "" {
+				title = "…"
+			}
+			if len(title) > 40 {
+				title = title[:40] + "…"
+			}
 			icon, colorFn := "○", ui.Dim
 			switch r.Status {
-			case 4: icon = "●"; colorFn = ui.Ok
-			case 2: icon = "◐"; colorFn = ui.Warn
-			case 1: icon = "○"; colorFn = ui.GoldText
+			case 4:
+				icon = "●"
+				colorFn = ui.Ok
+			case 2:
+				icon = "◐"
+				colorFn = ui.Warn
+			case 1:
+				icon = "○"
+				colorFn = ui.GoldText
 			}
 			status := statusNames[r.Status]
 			s4k := ""
-			if r.Is4K { s4k = " 4K" }
+			if r.Is4K {
+				s4k = " 4K"
+			}
 			b.WriteString(fmt.Sprintf("  %s %-12s %s (%s)%s\n", colorFn(icon), colorFn(status), title, ti.Year, s4k))
 		}
 	}
 
 	// Activity
 	if m.commands != nil {
-		var active []commandInfo
+		var active []statusCommandInfo
 		for _, c := range m.commands.Commands {
 			if c.Status == "started" || c.Status == "queued" {
 				active = append(active, c)
@@ -444,7 +651,9 @@ func (m tuiModel) View() string {
 			b.WriteString(fmt.Sprintf("\n  %s\n", ui.Bold("Activity")))
 			for _, c := range active {
 				icon := ui.Warn("⟳")
-				if c.Status == "queued" { icon = ui.Dim("◷") }
+				if c.Status == "queued" {
+					icon = ui.Dim("◷")
+				}
 				b.WriteString(fmt.Sprintf("  %s %s %s %s\n", icon, ui.Dim("["+c.Svc+"]"), c.Name, ui.Dim(c.Status)))
 			}
 		}
@@ -455,27 +664,49 @@ func (m tuiModel) View() string {
 		b.WriteString(fmt.Sprintf("\n  %s\n", ui.Bold("Health")))
 		for _, item := range m.health.Items {
 			level := ui.Warn("WARN")
-			if item.Type == "error" { level = ui.Err("ERROR") }
+			if item.Type == "error" {
+				level = ui.Err("ERROR")
+			}
 			msg := item.Message
-			if len(msg) > 58 { msg = msg[:58] + "…" }
+			if len(msg) > 58 {
+				msg = msg[:58] + "…"
+			}
 			b.WriteString(fmt.Sprintf("  %s %s %s\n", level, ui.Dim("["+item.Svc+"]"), msg))
 		}
 	}
 
-	// Queues
-	hasQ := (m.radarrQueue != nil && m.radarrQueue.Total > 0) || (m.sonarrQueue != nil && m.sonarrQueue.Total > 0)
+	// Queues (dynamic)
+	queueOrder := []string{"radarr", "sonarr", "lidarr", "readarr", "whisparr"}
+	hasQ := false
+	for _, svc := range queueOrder {
+		if q, ok := m.arrQueues[svc]; ok && q.Total > 0 {
+			hasQ = true
+			break
+		}
+	}
 	if hasQ {
 		b.WriteString(fmt.Sprintf("\n  %s\n", ui.Bold("Queues")))
-		for _, q := range []*queueResult{m.radarrQueue, m.sonarrQueue} {
-			if q == nil { continue }
+		for _, svc := range queueOrder {
+			q, ok := m.arrQueues[svc]
+			if !ok || q.Total == 0 {
+				continue
+			}
 			for _, rec := range q.Records {
 				colorFn := ui.Err
-				if rec.State == "downloading" { colorFn = ui.Ok } else if rec.State == "importPending" { colorFn = ui.Warn }
+				if rec.TrackedDownloadState == "downloading" {
+					colorFn = ui.Ok
+				} else if rec.TrackedDownloadState == "importPending" {
+					colorFn = ui.Warn
+				}
 				title := rec.Title
-				if len(title) > 42 { title = title[:42] + "…" }
+				if len(title) > 42 {
+					title = title[:42] + "…"
+				}
 				pct := ""
-				if rec.Size > 0 { pct = ui.Dim(fmt.Sprintf(" %.0f%%", (1-rec.Sizeleft/rec.Size)*100)) }
-				b.WriteString(fmt.Sprintf("  %s %-14s %s%s\n", ui.Dim("["+q.Svc+"]"), colorFn(rec.State), title, pct))
+				if rec.Size > 0 {
+					pct = ui.Dim(fmt.Sprintf(" %.0f%%", (1-rec.Sizeleft/rec.Size)*100))
+				}
+				b.WriteString(fmt.Sprintf("  %s %-14s %s%s\n", ui.Dim("["+svc+"]"), colorFn(rec.TrackedDownloadState), title, pct))
 			}
 		}
 	}
@@ -487,17 +718,26 @@ func (m tuiModel) View() string {
 		var dlCount, seedCount int
 		var totalDL int64
 		for _, t := range m.torrents.Torrents {
-			if dlStates[t.State] { dlCount++; totalDL += t.DLSpeed }
-			if seedStates[t.State] { seedCount++ }
+			if dlStates[t.State] {
+				dlCount++
+				totalDL += t.DLSpeed
+			}
+			if seedStates[t.State] {
+				seedCount++
+			}
 		}
 		b.WriteString(fmt.Sprintf("\n  %s\n", ui.Bold("Torrents")))
 		if dlCount > 0 {
 			for _, t := range m.torrents.Torrents {
-				if !dlStates[t.State] { continue }
+				if !dlStates[t.State] {
+					continue
+				}
 				pct := int(t.Progress * 100)
 				speed := float64(t.DLSpeed) / 1048576
 				name := t.Name
-				if len(name) > 38 { name = name[:38] + "…" }
+				if len(name) > 38 {
+					name = name[:38] + "…"
+				}
 				barLen := 12
 				filled := barLen * pct / 100
 				bar := strings.Repeat("█", filled) + strings.Repeat("░", barLen-filled)
@@ -512,6 +752,27 @@ func (m tuiModel) View() string {
 			dlCount, float64(totalDL)/1048576, seedCount, len(m.torrents.Torrents)))))
 	}
 
+	// Usenet (SABnzbd)
+	if m.sabnzbdData != nil && !m.sabnzbdData.Err && m.sabnzbdData.Queue != nil {
+		q := m.sabnzbdData.Queue
+		b.WriteString(fmt.Sprintf("\n  %s\n", ui.Bold("Usenet")))
+		for _, slot := range q.Slots {
+			name := slot.Filename
+			if len(name) > 42 {
+				name = name[:42] + "…"
+			}
+			b.WriteString(fmt.Sprintf("  %s %-14s %s  %s\n",
+				ui.Dim("[sabnzbd]"), ui.Ok(slot.Status), name, ui.Dim(slot.Percentage+"%")))
+		}
+		pauseStr := ""
+		if q.Paused {
+			pauseStr = " " + ui.Warn("(paused)")
+		}
+		b.WriteString(fmt.Sprintf("  %s\n", ui.Dim(fmt.Sprintf(
+			"%d in queue, %s remaining, %s/s%s",
+			q.NoOfSlots, q.SizeLeft, q.Speed, pauseStr))))
+	}
+
 	// Disk
 	if m.disk != nil && !m.disk.Err {
 		used := m.disk.Total - m.disk.Free
@@ -520,7 +781,11 @@ func (m tuiModel) View() string {
 		filled := int(float64(barLen) * pct / 100)
 		bar := strings.Repeat("█", filled) + strings.Repeat("░", barLen-filled)
 		colorFn := ui.Ok
-		if pct >= 90 { colorFn = ui.Err } else if pct >= 80 { colorFn = ui.Warn }
+		if pct >= 90 {
+			colorFn = ui.Err
+		} else if pct >= 80 {
+			colorFn = ui.Warn
+		}
 		b.WriteString(fmt.Sprintf("\n  %s  [%s] %s  %s free / %s\n",
 			ui.Bold("Disk"), bar, colorFn(fmt.Sprintf("%.0f%%", pct)),
 			ui.FmtSize(m.disk.Free), ui.FmtSize(m.disk.Total)))
@@ -550,7 +815,6 @@ func renderServiceCell(services map[string]serviceResult, name string) string {
 }
 
 func runStatusTUI() error {
-	// Force lipgloss to use color (alt screen)
 	lipgloss.SetHasDarkBackground(true)
 	p := tea.NewProgram(newTuiModel(), tea.WithAltScreen())
 	_, err := p.Run()

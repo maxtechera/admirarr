@@ -1,10 +1,9 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
 
-	"github.com/maxtechera/admirarr/internal/api"
+	"github.com/maxtechera/admirarr/internal/seerr"
 	"github.com/maxtechera/admirarr/internal/ui"
 	"github.com/spf13/cobra"
 )
@@ -39,105 +38,80 @@ var statusNames = map[int]string{
 }
 
 func runRequests(cmd *cobra.Command, args []string) {
-	ui.PrintBanner()
-
-	var data struct {
-		PageInfo struct {
-			Results int `json:"results"`
-		} `json:"pageInfo"`
-		Results []struct {
-			ID     int  `json:"id"`
-			Status int  `json:"status"`
-			Type   string `json:"type"`
-			Is4K   bool `json:"is4k"`
-			Media  struct {
-				MediaType string `json:"mediaType"`
-				TmdbID    int    `json:"tmdbId"`
-			} `json:"media"`
-			CreatedAt   string `json:"createdAt"`
-			RequestedBy struct {
-				DisplayName string `json:"displayName"`
-			} `json:"requestedBy"`
-		} `json:"results"`
-	}
-
-	if err := api.GetJSON("seerr", "api/v1/request", map[string]string{"take": "20"}, &data); err != nil {
-		fmt.Printf("\n  %s\n\n", ui.Err("Cannot reach Seerr"))
+	client := seerr.New()
+	data, err := client.Requests(20)
+	if err != nil {
+		if ui.IsJSON() {
+			ui.PrintJSON(map[string]string{"error": "Cannot reach Seerr"})
+		} else {
+			ui.PrintBanner()
+			fmt.Printf("\n  %s\n\n", ui.Err("Cannot reach Seerr"))
+		}
 		return
 	}
 
-	fmt.Printf("%s\n", ui.Bold(fmt.Sprintf("\n  Seerr — Requests (%d total)\n", data.PageInfo.Results)))
-
-	if len(data.Results) == 0 {
-		fmt.Printf("  %s\n\n", ui.Dim("No requests"))
-		return
+	type requestOut struct {
+		Title  string `json:"title"`
+		Year   string `json:"year"`
+		Status string `json:"status"`
+		User   string `json:"user"`
+		Is4K   bool   `json:"is_4k"`
 	}
-
+	var out []requestOut
 	for _, r := range data.Results {
+		title, year := client.ResolveTitle(r.Media.MediaType, r.Media.TmdbID)
 		status := statusNames[r.Status]
 		if status == "" {
 			status = fmt.Sprintf("?(%d)", r.Status)
 		}
-
-		// Resolve title from Seerr media endpoint
-		title, year := resolveTitle(r.Media.MediaType, r.Media.TmdbID)
-
-		icon := "○"
-		colorFn := ui.Dim
-		switch r.Status {
-		case 4: // AVAILABLE
-			icon = "●"
-			colorFn = ui.Ok
-		case 2: // APPROVED
-			icon = "◐"
-			colorFn = ui.Warn
-		case 1: // PENDING
-			icon = "○"
-			colorFn = ui.GoldText
-		case 3: // DECLINED
-			icon = "✗"
-			colorFn = ui.Err
-		}
-
-		suffix := ""
-		if r.Is4K {
-			suffix = " [4K]"
-		}
-		user := r.RequestedBy.DisplayName
-		date := r.CreatedAt
-		if len(date) > 10 {
-			date = date[:10]
-		}
-
-		fmt.Printf("  %s %-12s %s (%s)%s  — %s, %s\n",
-			colorFn(icon), colorFn(status), title, year, suffix, ui.Dim(user), ui.Dim(date))
+		out = append(out, requestOut{Title: title, Year: year, Status: status, User: r.RequestedBy.DisplayName, Is4K: r.Is4K})
 	}
-	fmt.Println()
+
+	ui.PrintOrJSON(out, func() {
+		ui.PrintBanner()
+		fmt.Printf("%s\n", ui.Bold(fmt.Sprintf("\n  Seerr — Requests (%d total)\n", data.PageInfo.Results)))
+
+		if len(data.Results) == 0 {
+			fmt.Printf("  %s\n\n", ui.Dim("No requests"))
+			return
+		}
+
+		for i, r := range data.Results {
+			icon := "○"
+			colorFn := ui.Dim
+			switch r.Status {
+			case 4:
+				icon = "●"
+				colorFn = ui.Ok
+			case 2:
+				icon = "◐"
+				colorFn = ui.Warn
+			case 1:
+				icon = "○"
+				colorFn = ui.GoldText
+			case 3:
+				icon = "✗"
+				colorFn = ui.Err
+			}
+
+			suffix := ""
+			if r.Is4K {
+				suffix = " [4K]"
+			}
+			user := r.RequestedBy.DisplayName
+			date := r.CreatedAt
+			if len(date) > 10 {
+				date = date[:10]
+			}
+
+			fmt.Printf("  %s %-12s %s (%s)%s  — %s, %s\n",
+				colorFn(icon), colorFn(out[i].Status), out[i].Title, out[i].Year, suffix, ui.Dim(user), ui.Dim(date))
+		}
+		fmt.Println()
+	})
 }
 
+// resolveTitle is kept for use by status.go which calls it directly.
 func resolveTitle(mediaType string, tmdbID int) (string, string) {
-	endpoint := fmt.Sprintf("api/v1/%s/%d", mediaType, tmdbID)
-	var info map[string]interface{}
-	if err := api.GetJSON("seerr", endpoint, nil, &info); err != nil {
-		return fmt.Sprintf("TMDB:%d", tmdbID), "?"
-	}
-
-	title := "?"
-	if t, ok := info["title"].(string); ok && t != "" {
-		title = t
-	} else if t, ok := info["name"].(string); ok && t != "" {
-		title = t
-	}
-
-	year := "?"
-	if d, ok := info["releaseDate"].(string); ok && len(d) >= 4 {
-		year = d[:4]
-	} else if d, ok := info["firstAirDate"].(string); ok && len(d) >= 4 {
-		year = d[:4]
-	}
-
-	return title, year
+	return seerr.New().ResolveTitle(mediaType, tmdbID)
 }
-
-// Ensure json is used (for the inline struct unmarshaling)
-var _ = json.Unmarshal

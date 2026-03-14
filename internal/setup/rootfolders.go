@@ -3,170 +3,115 @@ package setup
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 
-	"github.com/charmbracelet/huh"
-	"github.com/maxtechera/admirarr/internal/api"
+	"github.com/maxtechera/admirarr/internal/arr"
 	"github.com/maxtechera/admirarr/internal/config"
 	"github.com/maxtechera/admirarr/internal/ui"
 )
 
-// ValidateRootFolders runs Phase 5: root folder and media path validation.
+// ValidateRootFolders runs Phase 6: root folder and media path validation.
 func ValidateRootFolders(state *SetupState) StepResult {
-	r := StepResult{Name: "Root Folders & Media Paths"}
+	r := StepResult{Name: "Root Folders"}
 
-	fmt.Println(ui.Bold("\n  Phase 5 — Root Folders & Media Paths"))
-	fmt.Println(ui.Separator())
-
-	mediaWSL := state.MediaWSL
-	if mediaWSL == "" {
-		mediaWSL = config.MediaPathWSL()
-	}
-	mediaWin := state.MediaWin
-	if mediaWin == "" {
-		mediaWin = config.MediaPathWin()
+	dataPath := state.DataPath
+	if dataPath == "" {
+		dataPath = config.DataPath()
 	}
 
-	// 5a. Create missing media directories
+	// 6a. Create missing media directories (TRaSH Guides structure)
 	fmt.Println(ui.Bold("  Media Directories"))
 
-	requiredDirs := []string{"Movies", "TV Shows", "Downloads", "Downloads/movies", "Downloads/tv"}
+	// Build directory list based on selected services
+	requiredDirs := []string{
+		"media", "torrents",
+	}
+	for _, dc := range config.DefaultDownloadClients {
+		if state.Services[dc.Service] != nil {
+			requiredDirs = append(requiredDirs, dc.TorrentDir)
+		}
+	}
+	for _, rf := range config.DefaultRootFolders {
+		if state.Services[rf.Service] != nil {
+			requiredDirs = append(requiredDirs, rf.Subdir)
+		}
+	}
+
 	for _, dir := range requiredDirs {
-		path := filepath.Join(mediaWSL, dir)
+		path := filepath.Join(dataPath, dir)
 		if info, err := os.Stat(path); err == nil && info.IsDir() {
 			fmt.Printf("  %s %s\n", ui.Ok("✓"), path)
 			r.pass()
 			continue
 		}
 
-		// Check case-insensitive match
-		parent := filepath.Dir(path)
-		basename := filepath.Base(path)
-		var caseMatch string
-		if entries, err := os.ReadDir(parent); err == nil {
-			for _, e := range entries {
-				if strings.EqualFold(e.Name(), basename) && e.Name() != basename {
-					caseMatch = filepath.Join(parent, e.Name())
-					break
-				}
-			}
-		}
-
-		if caseMatch != "" {
-			fmt.Printf("  %s %s → found as %s\n", ui.Warn("!"), path, ui.Dim(filepath.Base(caseMatch)))
-			r.pass()
-			continue
-		}
-
-		fmt.Printf("  %s %s %s\n", ui.Err("✗"), path, ui.Err("missing"))
-
-		var confirm bool
-		form := huh.NewForm(huh.NewGroup(
-			huh.NewConfirm().
-				Title(fmt.Sprintf("Create %s?", path)).
-				Value(&confirm),
-		))
-		if err := form.Run(); err != nil || !confirm {
-			r.errf("directory %s does not exist", path)
+		if state.wouldFix(&r, "Create directory %s", path) {
 			continue
 		}
 
 		if err := os.MkdirAll(path, 0755); err != nil {
-			// Try PowerShell for Windows filesystem
-			winPath := wslToWin(path)
-			if _, err2 := execPowershell(fmt.Sprintf(`New-Item -Path '%s' -ItemType Directory -Force`, winPath)); err2 != nil {
-				r.errf("cannot create %s: %v", path, err)
-				continue
-			}
+			r.errf("cannot create %s: %v", path, err)
+			continue
 		}
 		fmt.Printf("  %s Created %s\n", ui.Ok("✓"), path)
 		r.fix()
 	}
 
-	// 5b. Validate root folders in Radarr/Sonarr
+	// 6b. Validate root folders in all *Arr services
 	fmt.Printf("\n%s\n", ui.Bold("  Root Folders"))
 
-	arrConfigs := []struct {
-		service  string
-		subdir   string
-	}{
-		{"radarr", "Movies"},
-		{"sonarr", "TV Shows"},
-	}
-
-	for _, ac := range arrConfigs {
-		svc := state.Services[ac.service]
+	for _, rf := range config.DefaultRootFolders {
+		svc := state.Services[rf.Service]
 		if svc == nil || !svc.Reachable {
-			fmt.Printf("  %s [%s] %s\n", ui.Dim("—"), ac.service, ui.Dim("skipped (not reachable)"))
+			fmt.Printf("  %s %s → %s\n", ui.Dim("—"), titleCase(rf.Service), ui.Dim("skipped (not reachable)"))
 			r.skip()
 			continue
 		}
 
-		ver := config.ServiceAPIVer(ac.service)
-		expectedWin := mediaWin + `\` + ac.subdir
+		client := arr.New(rf.Service)
+		expectedPath := filepath.Join(dataPath, rf.Subdir)
 
-		var roots []struct {
-			ID         int    `json:"id"`
-			Path       string `json:"path"`
-			Accessible bool   `json:"accessible"`
-			FreeSpace  int64  `json:"freeSpace"`
-		}
-		if err := api.GetJSON(ac.service, fmt.Sprintf("api/%s/rootfolder", ver), nil, &roots); err != nil {
-			r.errf("[%s] cannot query root folders: %v", ac.service, err)
+		roots, err := client.RootFolders()
+		if err != nil {
+			r.errf("%s → cannot query root folders: %v", titleCase(rf.Service), err)
 			continue
 		}
 
 		// Check if expected root folder exists
 		found := false
 		for _, root := range roots {
-			normalized := strings.ReplaceAll(root.Path, "/", `\`)
-			if strings.EqualFold(normalized, expectedWin) {
+			if root.Path == expectedPath {
 				found = true
 				if root.Accessible {
-					fmt.Printf("  %s [%s] %s  %s\n", ui.Ok("✓"), ac.service, root.Path,
+					fmt.Printf("  %s %s → %s  %s\n", ui.Ok("✓"), titleCase(rf.Service), root.Path,
 						ui.Dim(ui.FmtSize(root.FreeSpace)+" free"))
 					r.pass()
 				} else {
-					fmt.Printf("  %s [%s] %s %s\n", ui.Err("✗"), ac.service, root.Path,
+					fmt.Printf("  %s %s → %s %s\n", ui.Err("✗"), titleCase(rf.Service), root.Path,
 						ui.Err("inaccessible"))
-					r.errf("[%s] root folder %s exists but is not accessible — check if the directory exists on disk", ac.service, root.Path)
+					r.errf("%s → root folder %s exists but is not accessible", titleCase(rf.Service), root.Path)
 				}
 				break
 			}
 		}
 
 		if !found {
-			fmt.Printf("  %s [%s] Root folder %s not configured\n", ui.Err("✗"), ac.service, expectedWin)
+			// Auto-create root folder
+			fmt.Printf("  %s %s → Adding root folder %s\n", ui.GoldText("↻"), titleCase(rf.Service), expectedPath)
 
-			var confirm bool
-			form := huh.NewForm(huh.NewGroup(
-				huh.NewConfirm().
-					Title(fmt.Sprintf("Add root folder %s to %s?", expectedWin, ac.service)).
-					Value(&confirm),
-			))
-			if err := form.Run(); err != nil || !confirm {
-				r.errf("[%s] root folder %s not configured", ac.service, expectedWin)
+			if state.wouldFix(&r, "%s → Add root folder %s", titleCase(rf.Service), expectedPath) {
 				continue
 			}
 
-			payload := map[string]string{"path": expectedWin}
-			if _, err := api.Post(ac.service, fmt.Sprintf("api/%s/rootfolder", ver), payload, nil); err != nil {
-				r.errf("[%s] failed to create root folder: %v", ac.service, err)
+			if err := client.AddRootFolder(expectedPath); err != nil {
+				r.errf("%s → failed to create root folder: %v", titleCase(rf.Service), err)
 				continue
 			}
 
-			fmt.Printf("  %s [%s] Root folder %s added\n", ui.Ok("✓"), ac.service, expectedWin)
+			fmt.Printf("  %s %s → Root folder %s added\n", ui.Ok("✓"), titleCase(rf.Service), expectedPath)
 			r.fix()
 		}
 	}
 
 	return r
-}
-
-func execPowershell(cmd string) (string, error) {
-	out, err := exec.Command("/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
-		"-Command", cmd).CombinedOutput()
-	return string(out), err
 }

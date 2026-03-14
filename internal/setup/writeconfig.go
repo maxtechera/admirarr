@@ -11,12 +11,9 @@ import (
 	"github.com/maxtechera/admirarr/internal/ui"
 )
 
-// WriteConfig runs Phase 7: write validated config to disk.
+// WriteConfig runs Phase 11: write validated config to disk.
 func WriteConfig(state *SetupState) StepResult {
 	r := StepResult{Name: "Write Config"}
-
-	fmt.Println(ui.Bold("\n  Phase 7 — Write Config"))
-	fmt.Println(ui.Separator())
 
 	configDir := filepath.Join(os.Getenv("HOME"), ".config", "admirarr")
 	configPath := filepath.Join(configDir, "config.yaml")
@@ -34,7 +31,9 @@ func WriteConfig(state *SetupState) StepResult {
 
 	// Check if file exists
 	action := "write"
-	if _, err := os.Stat(configPath); err == nil {
+	if state.AutoMode {
+		action = "overwrite"
+	} else if _, err := os.Stat(configPath); err == nil {
 		var selected string
 		form := huh.NewForm(huh.NewGroup(
 			huh.NewSelect[string]().
@@ -69,6 +68,10 @@ func WriteConfig(state *SetupState) StepResult {
 		return r
 	}
 
+	if state.wouldFix(&r, "Write config to %s", configPath) {
+		return r
+	}
+
 	// Ensure directory exists
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		r.errf("cannot create config directory: %v", err)
@@ -86,17 +89,9 @@ func WriteConfig(state *SetupState) StepResult {
 }
 
 func buildYAML(state *SetupState) string {
-	host := state.Host
-	if host == "" {
-		host = config.Host()
-	}
-	mediaWSL := state.MediaWSL
-	if mediaWSL == "" {
-		mediaWSL = config.MediaPathWSL()
-	}
-	mediaWin := state.MediaWin
-	if mediaWin == "" {
-		mediaWin = config.MediaPathWin()
+	dataPath := state.DataPath
+	if dataPath == "" {
+		dataPath = config.DataPath()
 	}
 
 	var b strings.Builder
@@ -104,37 +99,63 @@ func buildYAML(state *SetupState) string {
 	b.WriteString("# ─── Admirarr Configuration ───────────────────────────────────────────\n")
 	b.WriteString("# Run `admirarr setup` to converge your stack to this desired state.\n\n")
 
-	b.WriteString(fmt.Sprintf("host: \"%s\"\n", host))
-	b.WriteString("wsl_gateway: \"auto\"\n\n")
+	b.WriteString(fmt.Sprintf("data_path: \"%s\"\n", dataPath))
 
-	b.WriteString("media:\n")
-	b.WriteString(fmt.Sprintf("  wsl: \"%s\"\n", mediaWSL))
-	b.WriteString(fmt.Sprintf("  win: \"%s\"\n\n", escapeBackslash(mediaWin)))
+	if state.RemoteHost != "" {
+		b.WriteString(fmt.Sprintf("host: \"%s\"\n", state.RemoteHost))
+	}
 
-	// Services
+	if state.ComposeDir != "" {
+		b.WriteString(fmt.Sprintf("compose_dir: \"%s\"\n", state.ComposeDir))
+	}
+
+	if state.Timezone != "" {
+		b.WriteString(fmt.Sprintf("timezone: \"%s\"\n", state.Timezone))
+	}
+
+	b.WriteString("\n")
+
+	// Services — only include detected/deployed services
 	b.WriteString("# ─── Services ─────────────────────────────────────────────────────────\n")
 	b.WriteString("services:\n")
-	for _, name := range config.AllServiceNames() {
+
+	selected := state.SelectedServices
+	if len(selected) == 0 {
+		selected = config.AllServiceNames()
+	}
+
+	for _, name := range selected {
 		svc := state.Services[name]
-		if svc == nil {
+		if svc == nil || (!svc.Detected && !svc.Reachable) {
 			continue
 		}
 		b.WriteString(fmt.Sprintf("  %s:\n", name))
 		b.WriteString(fmt.Sprintf("    port: %d\n", svc.Port))
-		if svc.Type != "" {
-			b.WriteString(fmt.Sprintf("    type: %s\n", svc.Type))
+		host := svc.Host
+		if host == "" {
+			host = "localhost"
 		}
-		if svc.Type == "docker" {
-			b.WriteString("    host: localhost\n")
+		b.WriteString(fmt.Sprintf("    host: %s\n", host))
+		if svc.IsDocker {
+			b.WriteString("    type: docker\n")
+		} else if svc.Reachable {
+			if state.RemoteHost != "" && svc.Host == state.RemoteHost {
+				b.WriteString("    type: remote\n")
+			} else {
+				b.WriteString("    type: native\n")
+			}
 		}
 	}
 
 	// Keys
 	b.WriteString("\n# ─── API Keys ─────────────────────────────────────────────────────────\n")
 	b.WriteString("keys:\n")
-	for _, name := range []string{"sonarr", "radarr", "prowlarr", "plex", "tautulli", "seerr"} {
+	for _, name := range []string{"jellyfin", "plex", "sonarr", "radarr", "prowlarr", "seerr", "bazarr", "tautulli", "sabnzbd"} {
 		key := ""
-		if state.ManualKeys != nil {
+		if state.Keys != nil {
+			key = state.Keys[name]
+		}
+		if key == "" && state.ManualKeys != nil {
 			key = state.ManualKeys[name]
 		}
 		b.WriteString(fmt.Sprintf("  %s: \"%s\"\n", name, key))
@@ -148,8 +169,11 @@ func buildYAML(state *SetupState) string {
 	b.WriteString(fmt.Sprintf("\n# ─── Quality ──────────────────────────────────────────────────────────\n"))
 	b.WriteString(fmt.Sprintf("quality_profile: \"%s\"\n", qp))
 
-	// Indexers
+	// Indexers — prefer state.Indexers (from setup) over config
 	indexers := config.GetIndexers()
+	if len(indexers) == 0 && len(state.Indexers) > 0 {
+		indexers = state.Indexers
+	}
 	if len(indexers) > 0 {
 		b.WriteString("\n# ─── Indexers ─────────────────────────────────────────────────────────\n")
 		b.WriteString("# Indexers NOT listed here will be removed during sync.\n")
@@ -176,8 +200,4 @@ func buildYAML(state *SetupState) string {
 	}
 
 	return b.String()
-}
-
-func escapeBackslash(s string) string {
-	return strings.ReplaceAll(s, `\`, `\\`)
 }

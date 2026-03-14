@@ -1,96 +1,195 @@
-#!/usr/bin/env bash
-# Admirarr installer — works on Linux, macOS, WSL
-# Usage: curl -fsSL https://raw.githubusercontent.com/maxtechera/admirarr/main/install.sh | bash
+#!/bin/sh
+# ─── Admirarr Installer ──────────────────────────────────────────────
+# One command, any platform:
+#
+#   curl -fsSL https://get.admirarr.dev | sh
+#
+# Or with wget:
+#   wget -qO- https://get.admirarr.dev | sh
+#
+# Options (environment variables):
+#   ADMIRARR_INSTALL_DIR  — install location (default: ~/.local/bin or /usr/local/bin)
+#   ADMIRARR_VERSION      — pin to a specific version (default: latest)
+#   NO_COLOR              — disable colored output
+# ──────────────────────────────────────────────────────────────────────
 set -e
 
 REPO="maxtechera/admirarr"
-BIN_NAME="admirarr"
-INSTALL_DIR="${ADMIRARR_INSTALL_DIR:-/usr/local/bin}"
+BINARY="admirarr"
 
-# Colors
-GOLD='\033[33m'
-GREEN='\033[92m'
-RED='\033[91m'
-DIM='\033[2m'
-BOLD='\033[1m'
-RESET='\033[0m'
+# ── Colors ──
 
-info()  { printf "${GOLD}⚓${RESET} %s\n" "$1"; }
-ok()    { printf "${GREEN}✓${RESET} %s\n" "$1"; }
-fail()  { printf "${RED}✗${RESET} %s\n" "$1"; exit 1; }
-
-echo ""
-printf "  ${GOLD}⚓ ${BOLD}ADMIRARR${RESET} ${DIM}installer${RESET}\n"
-printf "  ${DIM}Command your fleet.${RESET}\n\n"
-
-# Check Python 3
-if command -v python3 &>/dev/null; then
-    PY_VERSION=$(python3 --version 2>&1 | awk '{print $2}')
-    ok "Python ${PY_VERSION} found"
+if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
+  BOLD='\033[1m' DIM='\033[2m' GREEN='\033[32m'
+  RED='\033[31m' GOLD='\033[33m' RESET='\033[0m'
 else
-    fail "Python 3 is required but not found. Install it first:
-    macOS:   brew install python3
-    Ubuntu:  sudo apt install python3
-    Fedora:  sudo dnf install python3"
+  BOLD='' DIM='' GREEN='' RED='' GOLD='' RESET=''
 fi
 
-# Check Python version >= 3.7
-PY_MAJOR=$(python3 -c "import sys; print(sys.version_info.major)")
-PY_MINOR=$(python3 -c "import sys; print(sys.version_info.minor)")
-if [ "$PY_MAJOR" -lt 3 ] || ([ "$PY_MAJOR" -eq 3 ] && [ "$PY_MINOR" -lt 7 ]); then
-    fail "Python 3.7+ required, found ${PY_MAJOR}.${PY_MINOR}"
-fi
+info()  { printf "  ${GREEN}✓${RESET} %s\n" "$1"; }
+warn()  { printf "  ${GOLD}!${RESET} %s\n" "$1"; }
+fail()  { printf "  ${RED}✗${RESET} %s\n" "$1" >&2; exit 1; }
+step()  { printf "  ${DIM}→${RESET} %s\n" "$1"; }
 
-# Download
-info "Downloading admirarr..."
-DOWNLOAD_URL="https://raw.githubusercontent.com/${REPO}/main/admirarr"
-TMP_FILE=$(mktemp)
-if command -v curl &>/dev/null; then
-    curl -fsSL "$DOWNLOAD_URL" -o "$TMP_FILE"
-elif command -v wget &>/dev/null; then
-    wget -qO "$TMP_FILE" "$DOWNLOAD_URL"
+# ── Banner ──
+
+printf "\n  ${GOLD}⚓${RESET} ${BOLD}ADMIRARR${RESET} ${DIM}installer${RESET}\n"
+printf "  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+
+# ── Detect platform ──
+
+OS="$(uname -s)"
+ARCH="$(uname -m)"
+
+case "$OS" in
+  Linux*)          OS="linux"   ;;
+  Darwin*)         OS="darwin"  ;;
+  MINGW*|MSYS*|CYGWIN*) OS="windows" ;;
+  *)               fail "Unsupported OS: $OS" ;;
+esac
+
+case "$ARCH" in
+  x86_64|amd64)   ARCH="amd64" ;;
+  aarch64|arm64)   ARCH="arm64" ;;
+  armv7l)          ARCH="armv7" ;;
+  *)               fail "Unsupported architecture: $ARCH" ;;
+esac
+
+step "Platform: ${OS}/${ARCH}"
+
+# ── Check dependencies ──
+
+HAS_CURL=false
+HAS_WGET=false
+command -v curl >/dev/null 2>&1 && HAS_CURL=true
+command -v wget >/dev/null 2>&1 && HAS_WGET=true
+$HAS_CURL || $HAS_WGET || fail "curl or wget is required"
+command -v tar >/dev/null 2>&1 || fail "tar is required"
+
+fetch() {
+  if $HAS_CURL; then
+    curl -fsSL "$1"
+  else
+    wget -qO- "$1"
+  fi
+}
+
+download() {
+  if $HAS_CURL; then
+    curl -fsSL "$1" -o "$2"
+  else
+    wget -q "$1" -O "$2"
+  fi
+}
+
+# ── Check Docker (warn, don't fail) ──
+
+if command -v docker >/dev/null 2>&1; then
+  DOCKER_VERSION=$(docker --version 2>/dev/null | head -1)
+  info "Docker found: ${DOCKER_VERSION}"
 else
-    fail "curl or wget required"
+  warn "Docker not found — required for 'admirarr setup' to deploy services"
+  printf "    ${DIM}Install: https://docs.docker.com/get-docker/${RESET}\n"
 fi
-ok "Downloaded"
 
-# Install
-chmod +x "$TMP_FILE"
+# ── Determine version ──
 
-# Try install dir, fall back to ~/.local/bin
-if [ -w "$INSTALL_DIR" ]; then
-    mv "$TMP_FILE" "${INSTALL_DIR}/${BIN_NAME}"
-    ok "Installed to ${INSTALL_DIR}/${BIN_NAME}"
+if [ -n "${ADMIRARR_VERSION:-}" ]; then
+  VERSION="$ADMIRARR_VERSION"
+  step "Version: ${VERSION} (pinned)"
 else
-    # Try with sudo
-    if command -v sudo &>/dev/null; then
-        info "Installing to ${INSTALL_DIR} (requires sudo)..."
-        sudo mv "$TMP_FILE" "${INSTALL_DIR}/${BIN_NAME}"
-        sudo chmod +x "${INSTALL_DIR}/${BIN_NAME}"
-        ok "Installed to ${INSTALL_DIR}/${BIN_NAME}"
-    else
-        # Fall back to ~/.local/bin
-        INSTALL_DIR="${HOME}/.local/bin"
-        mkdir -p "$INSTALL_DIR"
-        mv "$TMP_FILE" "${INSTALL_DIR}/${BIN_NAME}"
-        ok "Installed to ${INSTALL_DIR}/${BIN_NAME}"
-
-        # Check if in PATH
-        if ! echo "$PATH" | grep -q "${INSTALL_DIR}"; then
-            echo ""
-            printf "  ${GOLD}!${RESET} Add this to your shell profile (~/.bashrc or ~/.zshrc):\n"
-            printf "  ${DIM}export PATH=\"\${HOME}/.local/bin:\${PATH}\"${RESET}\n"
-        fi
-    fi
+  step "Fetching latest release..."
+  RELEASE_JSON=$(fetch "https://api.github.com/repos/${REPO}/releases/latest" 2>/dev/null) || fail "Cannot reach GitHub API. Set ADMIRARR_VERSION to install offline."
+  VERSION=$(printf '%s' "$RELEASE_JSON" | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": *"//;s/".*//')
+  [ -z "$VERSION" ] && fail "Could not determine latest version"
+  step "Version: ${VERSION}"
 fi
 
-# Verify
-echo ""
-if command -v admirarr &>/dev/null; then
-    printf "${GREEN}✓${RESET} Ready! Run ${BOLD}admirarr help${RESET} to get started.\n"
+VERSION_NUM="${VERSION#v}"
+
+# ── Build download URL ──
+
+EXT="tar.gz"
+[ "$OS" = "windows" ] && EXT="zip"
+
+FILENAME="${BINARY}_${VERSION_NUM}_${OS}_${ARCH}.${EXT}"
+URL="https://github.com/${REPO}/releases/download/${VERSION}/${FILENAME}"
+
+# ── Determine install directory ──
+
+if [ -n "${ADMIRARR_INSTALL_DIR:-}" ]; then
+  INSTALL_DIR="$ADMIRARR_INSTALL_DIR"
+elif [ -w /usr/local/bin ]; then
+  INSTALL_DIR="/usr/local/bin"
 else
-    printf "  ${GREEN}✓${RESET} Installed! Open a new terminal or run:\n"
-    printf "  ${DIM}export PATH=\"${INSTALL_DIR}:\${PATH}\"${RESET}\n"
-    printf "  Then run ${BOLD}admirarr help${RESET} to get started.\n"
+  INSTALL_DIR="${HOME}/.local/bin"
 fi
-echo ""
+
+# ── Download and extract ──
+
+TMPDIR=$(mktemp -d)
+trap 'rm -rf "$TMPDIR"' EXIT
+
+step "Downloading ${FILENAME}..."
+download "$URL" "${TMPDIR}/${FILENAME}" || fail "Download failed: ${URL}"
+
+step "Extracting..."
+cd "$TMPDIR"
+if [ "$EXT" = "zip" ]; then
+  command -v unzip >/dev/null 2>&1 || fail "unzip is required for Windows archives"
+  unzip -q "$FILENAME"
+else
+  tar -xzf "$FILENAME"
+fi
+
+# ── Find binary ──
+
+FOUND=""
+for candidate in \
+  "${BINARY}" \
+  "${BINARY}.exe" \
+  */"${BINARY}" \
+  */"${BINARY}.exe"; do
+  if [ -f "$candidate" ]; then
+    FOUND="$candidate"
+    break
+  fi
+done
+[ -z "$FOUND" ] && fail "Binary not found in archive"
+
+# ── Install ──
+
+mkdir -p "$INSTALL_DIR"
+
+TARGET="${INSTALL_DIR}/${BINARY}"
+[ "$OS" = "windows" ] && TARGET="${TARGET}.exe"
+
+rm -f "$TARGET"
+cp "$FOUND" "$TARGET"
+chmod +x "$TARGET"
+
+info "Installed to ${TARGET}"
+
+# ── Verify ──
+
+if "$TARGET" --version >/dev/null 2>&1; then
+  INSTALLED=$("$TARGET" --version 2>&1 | head -1)
+  info "${INSTALLED}"
+fi
+
+# ── PATH check ──
+
+case ":${PATH}:" in
+  *":${INSTALL_DIR}:"*) ;;
+  *)
+    printf "\n"
+    warn "${INSTALL_DIR} is not in your PATH. Add it:\n"
+    printf "    ${DIM}echo 'export PATH=\"%s:\$PATH\"' >> ~/.bashrc${RESET}\n" "$INSTALL_DIR"
+    printf "    ${DIM}echo 'export PATH=\"%s:\$PATH\"' >> ~/.zshrc${RESET}\n" "$INSTALL_DIR"
+    ;;
+esac
+
+# ── Done ──
+
+printf "\n  ${GOLD}⚓${RESET} ${BOLD}Ready.${RESET} Run ${GOLD}admirarr setup${RESET} to deploy your stack.\n"
+printf "  ${DIM}Or ${RESET}${GOLD}admirarr doctor${RESET}${DIM} if you already have one running.${RESET}\n\n"

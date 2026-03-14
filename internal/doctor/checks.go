@@ -5,18 +5,24 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
-	"time"
 
 	"github.com/maxtechera/admirarr/internal/api"
+	"github.com/maxtechera/admirarr/internal/arr"
 	"github.com/maxtechera/admirarr/internal/config"
 	"github.com/maxtechera/admirarr/internal/keys"
+	"github.com/maxtechera/admirarr/internal/qbit"
+	"github.com/maxtechera/admirarr/internal/recyclarr"
 	"github.com/maxtechera/admirarr/internal/ui"
 )
 
 // Issue represents a diagnostic issue found.
 type Issue struct {
 	Description string
+	Category    string   // e.g. "service_down", "container_down", "missing_key", "quality", "deploy"
+	Service     string   // service name if applicable
+	FixFunc     func() error // built-in auto-fix, nil if manual only
 }
 
 // Result holds the diagnostic results.
@@ -25,19 +31,25 @@ type Result struct {
 	ChecksPassed int
 }
 
-// RunChecks runs all 9 diagnostic categories and returns results.
+// RunChecks runs all diagnostic categories and returns results.
 func RunChecks() *Result {
 	r := &Result{}
 
 	checkConnectivity(r)
 	checkAPIKeys(r)
-	checkConfigFiles(r)
-	checkDockerContainers(r)
+	checkContainers(r)
+	checkDownloadClient(r)
 	checkDiskSpace(r)
 	checkMediaPaths(r)
 	checkRootFolders(r)
+	checkQualityConfig(r)
 	checkIndexers(r)
 	checkServiceWarnings(r)
+	checkVPN(r)
+	checkPermissions(r)
+	checkHardlinks(r)
+	checkCrossService(r)
+	checkNewServices(r)
 
 	return r
 }
@@ -46,108 +58,103 @@ func checkConnectivity(r *Result) {
 	fmt.Println(ui.Bold("  Service Connectivity"))
 	fmt.Println(ui.Separator())
 
-	// Detect Windows processes
-	winProcesses := make(map[string]string)
-	out, err := exec.Command("/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
-		"-Command", "Get-Process | Select-Object Name,Id | Format-Table -HideTableHeaders").Output()
-	if err == nil {
-		for _, line := range strings.Split(string(out), "\n") {
-			parts := strings.Fields(strings.TrimSpace(line))
-			if len(parts) >= 2 {
-				winProcesses[strings.ToLower(parts[0])] = parts[1]
+	// Probe all services across candidate hosts (localhost, global host, WSL gateway)
+	probed := config.ProbeAll()
+
+	for _, name := range config.AllServiceNames() {
+		def, ok := config.GetServiceDef(name)
+		if !ok || def.Port == 0 {
+			continue
+		}
+
+		configured := config.IsConfigured(name)
+		ss := probed[name]
+		port := config.ServicePort(name)
+
+		addr := fmt.Sprintf(":%d", port)
+		if ss.Host != "" && ss.Host != "localhost" && ss.Host != "127.0.0.1" {
+			addr = fmt.Sprintf("%s:%d", ss.Host, port)
+		}
+		rtLabel := "  " + ui.Dim(ss.Runtime.Label)
+
+		if ss.Up {
+			r.ChecksPassed++
+			speed := ui.Ok(fmt.Sprintf("%dms", ss.LatencyMs))
+			if ss.LatencyMs > 2000 {
+				speed = ui.Warn(fmt.Sprintf("%dms (slow)", ss.LatencyMs))
+				r.Issues = append(r.Issues, Issue{Description:
+					fmt.Sprintf("SLOW SERVICE: %s responded in %dms (>2s). URL: http://%s:%d/. Check resource usage or network latency.",
+						name, ss.LatencyMs, ss.Host, port),
+				})
 			}
+			fmt.Printf("  %s %-15s %-12s %s%s\n", ui.Ok("✓"), name, ui.Dim(addr), speed, rtLabel)
+			for _, w := range ss.Warnings {
+				r.Issues = append(r.Issues, Issue{
+					Description: fmt.Sprintf("WARNING [%s]: %s", name, w),
+					Category:    "misconfiguration",
+					Service:     name,
+				})
+				fmt.Printf("  %s %-15s %s\n", ui.Warn("⚠"), name, ui.Warn(w))
+			}
+		} else if configured {
+			extra := tryDockerDiag(name, def.ContainerName, port)
+			r.Issues = append(r.Issues, Issue{Description:
+				fmt.Sprintf("UNREACHABLE: %s — tried %s. %s",
+					name, formatCandidates(name, port), extra.fixHint),
+			})
+			statusExtra := ""
+			if extra.short != "" {
+				statusExtra = " " + ui.Dim("("+extra.short+")")
+			}
+			fmt.Printf("  %s %-15s %-12s %s%s%s\n", ui.Err("✗"), name, ui.Dim(addr), ui.Err("unreachable"), statusExtra, rtLabel)
+		} else {
+			fmt.Printf("  %s %-15s %-12s %s%s\n", ui.Dim("—"), name, ui.Dim(fmt.Sprintf(":%d", def.Port)), ui.Dim("not detected"), rtLabel)
+		}
+	}
+}
+
+// formatCandidates returns a human-readable list of hosts that were tried.
+func formatCandidates(name string, port int) string {
+	hosts := config.CandidateHosts(name)
+	var parts []string
+	for _, h := range hosts {
+		parts = append(parts, fmt.Sprintf("http://%s:%d/", h, port))
+	}
+	return strings.Join(parts, ", ")
+}
+
+type diagInfo struct {
+	short   string
+	fixHint string
+}
+
+// tryDockerDiag attempts to get diagnostic info from Docker if available.
+// Falls back to generic hints if Docker is not available.
+func tryDockerDiag(name, container string, port int) diagInfo {
+	// Try docker inspect (works if Docker is available and container exists)
+	out, err := exec.Command("docker", "inspect", "-f", "{{.State.Status}}", container).Output()
+	if err != nil {
+		// Docker not available or container not found — give generic hint
+		return diagInfo{
+			fixHint: fmt.Sprintf("Check that %s is running and listening on port %d.", name, port),
 		}
 	}
 
-	procNames := map[string]string{
-		"sonarr": "sonarr", "radarr": "radarr", "prowlarr": "prowlarr",
-		"plex": "plex media server", "tautulli": "tautulli", "qbittorrent": "qbittorrent",
-	}
-	winServiceNames := map[string]string{
-		"sonarr": "Sonarr", "radarr": "Radarr", "prowlarr": "Prowlarr",
-		"plex": "Plex Media Server",
-	}
-	desktopApps := map[string]bool{"qbittorrent": true, "tautulli": true}
-
-	for _, name := range config.AllServiceNames() {
-		svc := config.Get().Services[name]
-		t0 := time.Now()
-		up := api.CheckReachable(name)
-		elapsed := time.Since(t0).Milliseconds()
-
-		if up {
-			r.ChecksPassed++
-			speed := ui.Ok(fmt.Sprintf("%dms", elapsed))
-			if elapsed > 2000 {
-				speed = ui.Warn(fmt.Sprintf("%dms (slow)", elapsed))
-				r.Issues = append(r.Issues, Issue{
-					fmt.Sprintf("SLOW SERVICE: %s responded in %dms (>2s). Type: %s. URL: http://%s:%d/. Fix: check %s resource usage or network latency.",
-						name, elapsed, svc.Type, svc.Host, svc.Port, name),
-				})
-			}
-			fmt.Printf("  %s %-15s %-12s %s\n", ui.Ok("✓"), name, ui.Dim(fmt.Sprintf(":%d", svc.Port)), speed)
-		} else {
-			diag := ""
-			fixHint := ""
-			if svc.Type == "docker" {
-				cOut, cErr := exec.Command("docker", "inspect", "-f", "{{.State.Status}}", name).Output()
-				cstate := strings.TrimSpace(string(cOut))
-				if cErr == nil && cstate == "running" {
-					diag = fmt.Sprintf("Container is running but port %d not responding. ", svc.Port)
-					fixHint = fmt.Sprintf("Fix: container '%s' is running but not serving on port %d. Check logs: docker logs --tail 30 %s. Try restart: docker restart %s",
-						name, svc.Port, name, name)
-				} else if cErr == nil && cstate != "" {
-					diag = fmt.Sprintf("Container state: %s. ", cstate)
-					fixHint = fmt.Sprintf("Fix: run 'docker start %s'. Check logs: docker logs --tail 30 %s", name, name)
-				} else {
-					fixHint = fmt.Sprintf("Fix: container not found. Run 'docker ps -a | grep %s'", name)
-				}
-			} else {
-				procName := procNames[name]
-				procRunning := false
-				procPID := ""
-				for k, v := range winProcesses {
-					if strings.Contains(k, procName) {
-						procRunning = true
-						procPID = v
-						break
-					}
-				}
-
-				if procRunning {
-					diag = fmt.Sprintf("Process IS running (PID %s) but port %d not reachable from WSL. ", procPID, svc.Port)
-					if desktopApps[name] {
-						fixHint = fmt.Sprintf("Fix: %s process is running (PID %s) but http://%s:%d/ is not responding. This is a desktop app, NOT a Windows service. Check Web UI settings, port binding, or Windows Firewall.",
-							name, procPID, svc.Host, svc.Port)
-					} else {
-						winSvc := winServiceNames[name]
-						fixHint = fmt.Sprintf("Fix: %s process is running (PID %s) but http://%s:%d/ is not responding. Try: powershell Restart-Service '%s' -Force. Or check Windows Firewall.",
-							name, procPID, svc.Host, svc.Port, winSvc)
-					}
-				} else {
-					diag = "Process NOT found running on Windows. "
-					if desktopApps[name] {
-						fixHint = fmt.Sprintf("Fix: %s is not running. It is a desktop app — start it from Windows Start Menu.", name)
-					} else {
-						winSvc := winServiceNames[name]
-						fixHint = fmt.Sprintf("Fix: %s is not running. Start: powershell Start-Service '%s'. If that fails: powershell Get-Service '%s'.",
-							name, winSvc, winSvc)
-					}
-				}
-			}
-
-			r.Issues = append(r.Issues, Issue{
-				fmt.Sprintf("UNREACHABLE: %s (%s) at http://%s:%d/ — %s%s", name, svc.Type, svc.Host, svc.Port, diag, fixHint),
-			})
-			statusExtra := ""
-			if diag != "" {
-				short := "not running"
-				if strings.Contains(diag, "IS running") {
-					short = "process up, port blocked"
-				}
-				statusExtra = " " + ui.Dim("("+short+")")
-			}
-			fmt.Printf("  %s %-15s %-12s %s %s%s\n", ui.Err("✗"), name, ui.Dim(fmt.Sprintf(":%d", svc.Port)), ui.Err("unreachable"), ui.Dim("["+svc.Type+"]"), statusExtra)
+	state := strings.TrimSpace(string(out))
+	switch {
+	case state == "running":
+		return diagInfo{
+			short:   "container up, port not responding",
+			fixHint: fmt.Sprintf("Container '%s' is running but port %d not responding. Check logs: docker logs --tail 30 %s", container, port, container),
+		}
+	case state != "":
+		return diagInfo{
+			short:   state,
+			fixHint: fmt.Sprintf("Container '%s' state: %s. Try: docker start %s", container, state, container),
+		}
+	default:
+		return diagInfo{
+			fixHint: fmt.Sprintf("Check that %s is running and listening on port %d.", name, port),
 		}
 	}
 }
@@ -156,127 +163,54 @@ func checkAPIKeys(r *Result) {
 	fmt.Println(ui.Bold("\n  API Keys"))
 	fmt.Println(ui.Separator())
 
-	keyConfigs := map[string]string{
-		"sonarr":   "/mnt/c/ProgramData/Sonarr/config.xml",
-		"radarr":   "/mnt/c/ProgramData/Radarr/config.xml",
-		"prowlarr": "/mnt/c/ProgramData/Prowlarr/config.xml",
-		"plex":     "/mnt/c/Users/Max/AppData/Local/Plex/Plex Media Server/Preferences.xml",
-		"tautulli": "/mnt/c/ProgramData/Tautulli/config.ini",
-		"seerr":    "docker exec seerr cat /app/config/settings.json",
-	}
-	altPaths := map[string][]string{
-		"tautulli": {
-			"/mnt/c/Users/Max/AppData/Local/Tautulli/config.ini",
-			"/mnt/c/Users/Max/AppData/Roaming/Tautulli/config.ini",
-		},
-		"sonarr": {"/mnt/c/Users/Max/AppData/Roaming/Sonarr/config.xml"},
-		"radarr": {"/mnt/c/Users/Max/AppData/Roaming/Radarr/config.xml"},
-	}
+	for _, name := range config.AllServiceNames() {
+		def, ok := config.GetServiceDef(name)
+		if !ok || def.KeySource == "none" || !def.HasAPI {
+			continue
+		}
 
-	for _, svc := range []string{"sonarr", "radarr", "prowlarr", "plex", "tautulli", "seerr"} {
-		key := keys.Get(svc)
+		configured := config.IsConfigured(name)
+		key := keys.Get(name)
 		if key != "" {
 			r.ChecksPassed++
 			masked := key[:4] + "…" + key[len(key)-4:]
 			if len(key) <= 8 {
 				masked = "****"
 			}
-			fmt.Printf("  %s %-15s %s\n", ui.Ok("✓"), svc, ui.Dim(masked))
-		} else {
-			configPath := keyConfigs[svc]
-			alts := altPaths[svc]
-			var foundAlt string
-			for _, alt := range alts {
-				if _, err := os.Stat(alt); err == nil {
-					foundAlt = alt
-					break
-				}
-			}
-			fixHint := ""
-			if foundAlt != "" {
-				fixHint = fmt.Sprintf("Config found at alternative path: %s.", foundAlt)
-			} else if svc == "seerr" {
-				fixHint = fmt.Sprintf("Read from Docker: %s. Check container is running.", configPath)
-			} else {
-				fixHint = fmt.Sprintf("Expected config at: %s. Or get the API key from the %s web UI: Settings > General > API Key.", configPath, svc)
-			}
-			r.Issues = append(r.Issues, Issue{fmt.Sprintf("API KEY MISSING: %s API key not found. %s", svc, fixHint)})
-			extra := ""
-			if foundAlt != "" {
-				extra = " " + ui.Dim("(found at "+foundAlt+")")
-			}
-			fmt.Printf("  %s %-15s %s%s\n", ui.Err("✗"), svc, ui.Err("not found"), extra)
+			fmt.Printf("  %s %-15s %s\n", ui.Ok("✓"), name, ui.Dim(masked))
+		} else if configured {
+			host := config.ServiceHost(name)
+			port := config.ServicePort(name)
+			hint := fmt.Sprintf("Get the API key from the %s web UI (http://%s:%d/) under Settings.", name, host, port)
+			r.Issues = append(r.Issues, Issue{Description: fmt.Sprintf("API KEY MISSING: %s — %s", name, hint)})
+			fmt.Printf("  %s %-15s %s\n", ui.Err("✗"), name, ui.Err("not found"))
 		}
+		// Non-configured services without keys are silently skipped
 	}
 }
 
-func checkConfigFiles(r *Result) {
-	fmt.Println(ui.Bold("\n  Config Files"))
-	fmt.Println(ui.Separator())
-
-	configs := map[string]string{
-		"Sonarr":   "/mnt/c/ProgramData/Sonarr/config.xml",
-		"Radarr":   "/mnt/c/ProgramData/Radarr/config.xml",
-		"Prowlarr": "/mnt/c/ProgramData/Prowlarr/config.xml",
-		"Plex":     "/mnt/c/Users/Max/AppData/Local/Plex/Plex Media Server/Preferences.xml",
-		"Tautulli": "/mnt/c/ProgramData/Tautulli/config.ini",
-	}
-	configAlts := map[string][]string{
-		"Tautulli": {
-			"/mnt/c/Users/Max/AppData/Local/Tautulli/config.ini",
-			"/mnt/c/Users/Max/AppData/Roaming/Tautulli/config.ini",
-		},
-		"Sonarr": {"/mnt/c/Users/Max/AppData/Roaming/Sonarr/config.xml"},
-		"Radarr": {"/mnt/c/Users/Max/AppData/Roaming/Radarr/config.xml"},
-	}
-
-	for _, name := range []string{"Sonarr", "Radarr", "Prowlarr", "Plex", "Tautulli"} {
-		path := configs[name]
-		if _, err := os.Stat(path); err == nil {
-			r.ChecksPassed++
-			fmt.Printf("  %s %-15s %s\n", ui.Ok("✓"), name, ui.Dim(path))
-		} else {
-			alts := configAlts[name]
-			var foundAlt string
-			for _, alt := range alts {
-				if _, err := os.Stat(alt); err == nil {
-					foundAlt = alt
-					break
-				}
-			}
-			if foundAlt != "" {
-				r.ChecksPassed++
-				r.Issues = append(r.Issues, Issue{
-					fmt.Sprintf("CONFIG ALTERNATE: %s config not at expected %s but found at %s.", name, path, foundAlt),
-				})
-				fmt.Printf("  %s %-15s %s %s\n", ui.Warn("!"), name, ui.Warn("alt path"), ui.Dim(foundAlt))
-			} else {
-				r.Issues = append(r.Issues, Issue{
-					fmt.Sprintf("CONFIG MISSING: %s config not found at %s. Ensure %s is installed on Windows.", name, path, name),
-				})
-				fmt.Printf("  %s %-15s %s %s\n", ui.Err("✗"), name, ui.Err("missing"), ui.Dim(path))
-			}
-		}
-	}
-}
-
-func checkDockerContainers(r *Result) {
+// checkContainers checks Docker container status if Docker is available.
+func checkContainers(r *Result) {
 	fmt.Println(ui.Bold("\n  Docker Containers"))
 	fmt.Println(ui.Separator())
 
-	out, err := exec.Command("docker", "ps", "-a", "--format", "{{.Names}}\t{{.Status}}\t{{.Image}}",
-		"--filter", "name=seerr", "--filter", "name=bazarr",
-		"--filter", "name=organizr", "--filter", "name=flaresolverr").Output()
+	// Build filter for all known container names
+	var args []string
+	args = append(args, "ps", "-a", "--format", "{{.Names}}\t{{.Status}}\t{{.Image}}")
+	for _, name := range config.AllServiceNames() {
+		container := config.ContainerName(name)
+		args = append(args, "--filter", "name=^"+container+"$")
+	}
+
+	out, err := exec.Command("docker", args...).Output()
 	if err != nil {
-		r.Issues = append(r.Issues, Issue{"DOCKER UNAVAILABLE: Docker CLI not found or not accessible."})
-		fmt.Printf("  %s Docker not accessible\n", ui.Err("✗"))
+		fmt.Printf("  %s %s\n", ui.Dim("—"), ui.Dim("Docker not available (skipping container checks)"))
 		return
 	}
 
 	lines := strings.TrimSpace(string(out))
 	if lines == "" {
-		r.Issues = append(r.Issues, Issue{"NO CONTAINERS: No media stack Docker containers found."})
-		fmt.Printf("  %s No media containers found\n", ui.Err("✗"))
+		fmt.Printf("  %s %s\n", ui.Dim("—"), ui.Dim("No managed containers found"))
 		return
 	}
 
@@ -298,7 +232,7 @@ func checkDockerContainers(r *Result) {
 			r.ChecksPassed++
 			fmt.Printf("  %s %-15s %s %s\n", ui.Ok("✓"), cname, ui.Ok(status), ui.Dim(image))
 		} else {
-			r.Issues = append(r.Issues, Issue{
+			r.Issues = append(r.Issues, Issue{Description:
 				fmt.Sprintf("CONTAINER DOWN: '%s' (image: %s) status: %s. Fix: docker start %s", cname, image, status, cname),
 			})
 			fmt.Printf("  %s %-15s %s %s\n", ui.Err("✗"), cname, ui.Err(status), ui.Dim(image))
@@ -306,118 +240,438 @@ func checkDockerContainers(r *Result) {
 	}
 }
 
+func checkDownloadClient(r *Result) {
+	fmt.Println(ui.Bold("\n  Download Client (qBittorrent)"))
+	fmt.Println(ui.Separator())
+
+	svc := config.Get().Services["qbittorrent"]
+
+	// 1. Check qBittorrent reachability
+	if !api.CheckReachable("qbittorrent") {
+		r.Issues = append(r.Issues, Issue{Description:
+			fmt.Sprintf("QBITTORRENT UNREACHABLE at http://%s:%d/. "+
+				"Check that qBittorrent is running and WebUI is enabled. "+
+				"If WebUI binds to 127.0.0.1, change it to 0.0.0.0 in Options → Web UI → IP address.",
+				svc.Host, svc.Port),
+		})
+		fmt.Printf("  %s qBittorrent at %s:%d — %s\n", ui.Err("✗"), svc.Host, svc.Port, ui.Err("unreachable"))
+
+		// Try to diagnose via config file for native/remote services
+		rt := config.DetectRuntime("qbittorrent")
+		if rt.Type == config.TypeNative || rt.Type == config.TypeRemote {
+			checkQbitNativeConfig(r)
+		}
+		return
+	}
+
+	// 2. Get qBit version
+	qc := qbit.New()
+	ver, err := qc.Version()
+	if err == nil {
+		fmt.Printf("  %s qBittorrent %s at %s:%d\n", ui.Ok("✓"), ver, svc.Host, svc.Port)
+		r.ChecksPassed++
+	}
+
+	// 3. Check preferences (bind address, save path)
+	prefs, err := qc.Preferences()
+	if err == nil {
+		if prefs.WebUIAddress == "*" || prefs.WebUIAddress == "0.0.0.0" || prefs.WebUIAddress == "" {
+			r.ChecksPassed++
+			fmt.Printf("  %s WebUI bind: %s (accessible from network)\n", ui.Ok("✓"), prefs.WebUIAddress)
+		} else if prefs.WebUIAddress == "127.0.0.1" || prefs.WebUIAddress == "localhost" {
+			r.Issues = append(r.Issues, Issue{Description:
+				fmt.Sprintf("QBITTORRENT BIND ADDRESS: WebUI bound to %s — not accessible from other machines. "+
+					"Change to 0.0.0.0 in Options → Web UI → IP address.", prefs.WebUIAddress),
+			})
+			fmt.Printf("  %s WebUI bind: %s %s\n", ui.Warn("!"), prefs.WebUIAddress, ui.Warn("(localhost only — other services may not reach it)"))
+		}
+
+		// Just report save path — no hardcoded expectation.
+		// The Download Pipeline check cross-validates paths against actual root folders.
+		if prefs.SavePath != "" {
+			r.ChecksPassed++
+			fmt.Printf("  %s Save path: %s\n", ui.Ok("✓"), prefs.SavePath)
+		} else {
+			r.Issues = append(r.Issues, Issue{Description:
+				"QBITTORRENT SAVE PATH: Not configured. Set in Options → Downloads → Default Save Path.",
+			})
+			fmt.Printf("  %s Save path: %s\n", ui.Err("✗"), ui.Err("not set"))
+		}
+	}
+
+	// 4. List categories — cross-validation happens in Download Pipeline check
+	cats, err := qc.Categories()
+	if err == nil {
+		if len(cats) > 0 {
+			r.ChecksPassed++
+			var catNames []string
+			for name := range cats {
+				catNames = append(catNames, name)
+			}
+			fmt.Printf("  %s Categories: %s\n", ui.Ok("✓"), strings.Join(catNames, ", "))
+		} else {
+			fmt.Printf("  %s %s\n", ui.Warn("!"), ui.Warn("No categories configured — downloads may land in wrong folder"))
+		}
+	}
+
+	// 5. Check *Arr download client config points to qBit correctly
+	for _, svcName := range []string{"radarr", "sonarr"} {
+		if !api.CheckReachable(svcName) {
+			continue
+		}
+		client := arr.New(svcName)
+		clients, err := client.DownloadClients()
+		if err != nil {
+			continue
+		}
+
+		var found bool
+		for _, dc := range clients {
+			if dc.Implementation == "QBittorrent" {
+				found = true
+				host := fmt.Sprintf("%v", dc.GetField("host"))
+				port := fmt.Sprintf("%v", dc.GetField("port"))
+
+				// Check if the configured host:port actually resolves to qBit
+				if dc.Enable {
+					r.ChecksPassed++
+					fmt.Printf("  %s [%s] download client → %s:%s\n", ui.Ok("✓"), svcName, host, port)
+				} else {
+					r.Issues = append(r.Issues, Issue{Description:
+						fmt.Sprintf("DOWNLOAD CLIENT DISABLED: qBittorrent client in %s is disabled. Enable it in %s Settings → Download Clients.", svcName, svcName),
+					})
+					fmt.Printf("  %s [%s] download client → %s:%s %s\n", ui.Err("✗"), svcName, host, port, ui.Err("disabled"))
+				}
+				break
+			}
+		}
+		if !found {
+			r.Issues = append(r.Issues, Issue{Description:
+				fmt.Sprintf("NO DOWNLOAD CLIENT: %s has no qBittorrent download client configured. Run admirarr setup or add manually in %s Settings → Download Clients.",
+					svcName, svcName),
+			})
+			fmt.Printf("  %s [%s] %s\n", ui.Err("✗"), svcName, ui.Err("no qBittorrent client configured"))
+		}
+	}
+}
+
+// checkQbitNativeConfig reads qBittorrent config from native filesystem to diagnose issues.
+func checkQbitNativeConfig(r *Result) {
+	paths := qbitConfigPaths()
+	for _, iniPath := range paths {
+		data, err := os.ReadFile(iniPath)
+		if err != nil {
+			continue
+		}
+
+		lines := strings.Split(string(data), "\n")
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			if strings.HasPrefix(line, "WebUI\\Address=") || strings.HasPrefix(line, "WebUI\\Port=") ||
+				strings.HasPrefix(line, "WebUI\\Enabled=") {
+				parts := strings.SplitN(line, "=", 2)
+				if len(parts) == 2 {
+					key := strings.TrimPrefix(parts[0], "WebUI\\")
+					val := parts[1]
+					if key == "Address" && (val == "127.0.0.1" || val == "localhost") {
+						fmt.Printf("  %s Config: %s — WebUI bound to %s (change to 0.0.0.0)\n",
+							ui.Warn("!"), ui.Dim(iniPath), val)
+					} else if key == "Enabled" && val == "false" {
+						fmt.Printf("  %s Config: %s — WebUI is disabled\n",
+							ui.Err("✗"), ui.Dim(iniPath))
+					}
+				}
+			}
+		}
+		return // only check first user found
+	}
+}
+
+// qbitConfigPaths returns candidate paths for qBittorrent config files.
+func qbitConfigPaths() []string {
+	home := os.Getenv("HOME")
+	var paths []string
+
+	// WSL: Windows paths
+	if _, err := os.Stat("/mnt/c/Windows"); err == nil {
+		entries, _ := os.ReadDir("/mnt/c/Users")
+		for _, e := range entries {
+			if !e.IsDir() || e.Name() == "Public" || e.Name() == "Default" || e.Name() == "Default User" || e.Name() == "All Users" {
+				continue
+			}
+			paths = append(paths,
+				fmt.Sprintf("/mnt/c/Users/%s/AppData/Roaming/qBittorrent/qBittorrent.ini", e.Name()),
+				fmt.Sprintf("/mnt/c/Users/%s/AppData/Local/qBittorrent/qBittorrent.ini", e.Name()),
+			)
+		}
+	}
+
+	switch runtime.GOOS {
+	case "darwin":
+		paths = append(paths, filepath.Join(home, "Library", "Application Support", "qBittorrent", "qBittorrent.ini"))
+	default:
+		paths = append(paths,
+			filepath.Join(home, ".config", "qBittorrent", "qBittorrent.ini"),
+			filepath.Join(home, ".local", "share", "qBittorrent", "qBittorrent.ini"),
+		)
+	}
+
+	return paths
+}
+
+// checkDiskSpace queries root folders from Radarr/Sonarr via API to find actual
+// media paths, then checks disk space on each unique filesystem. Falls back to
+// the configured data_path if no services are reachable.
 func checkDiskSpace(r *Result) {
 	fmt.Println(ui.Bold("\n  Disk Space"))
 	fmt.Println(ui.Separator())
 
-	mediaWSL := config.MediaPathWSL()
-	mediaWin := config.MediaPathWin()
-	total, free, err := statfs(mediaWSL)
-	if err != nil {
-		r.Issues = append(r.Issues, Issue{
-			fmt.Sprintf("DISK INACCESSIBLE: Cannot read %s. Check if drive is mounted.", mediaWSL),
-		})
-		fmt.Printf("  %s Cannot access %s\n", ui.Err("✗"), mediaWSL)
-		return
+	// Collect unique paths from actual service root folders
+	checked := make(map[string]bool)
+
+	for _, svcName := range []string{"radarr", "sonarr"} {
+		if !api.CheckReachable(svcName) {
+			continue
+		}
+		roots, err := arr.New(svcName).RootFolders()
+		if err != nil {
+			continue
+		}
+		for _, root := range roots {
+			// Root folders report their own free space — use it directly
+			if root.FreeSpace > 0 && !checked[root.Path] {
+				checked[root.Path] = true
+				label := fmt.Sprintf("[%s] %s", svcName, root.Path)
+				freeGB := float64(root.FreeSpace) / (1024 * 1024 * 1024)
+				if freeGB < 10 {
+					r.Issues = append(r.Issues, Issue{Description:
+						fmt.Sprintf("DISK LOW: %s has only %s free.", label, ui.FmtSize(root.FreeSpace)),
+					})
+					fmt.Printf("  %s %s  %s free\n", ui.Warn("!"), label, ui.Warn(ui.FmtSize(root.FreeSpace)))
+				} else {
+					r.ChecksPassed++
+					fmt.Printf("  %s %s  %s free\n", ui.Ok("✓"), label, ui.FmtSize(root.FreeSpace))
+				}
+			}
+		}
 	}
 
-	pctUsed := float64(total-free) / float64(total) * 100
+	// Also check qBittorrent save path if reachable
+	if api.CheckReachable("qbittorrent") {
+		prefs, err := qbit.New().Preferences()
+		if err == nil && prefs.SavePath != "" && !checked[prefs.SavePath] {
+			checked[prefs.SavePath] = true
+			total, free, err := statfs(prefs.SavePath)
+			if err == nil {
+				checkDiskPath(r, "[qbittorrent] "+prefs.SavePath, total, free)
+			}
+		}
+	}
 
+	// Fallback: check local data_path if nothing was discovered
+	if len(checked) == 0 {
+		dataPath := config.DataPath()
+		total, free, err := statfs(dataPath)
+		if err != nil {
+			fmt.Printf("  %s No media paths discovered (services down?) and %s not accessible\n",
+				ui.Dim("—"), dataPath)
+			return
+		}
+		checkDiskPath(r, dataPath, total, free)
+	}
+}
+
+func checkDiskPath(r *Result, label string, total, free int64) {
+	pctUsed := float64(total-free) / float64(total) * 100
 	if pctUsed > 95 {
-		r.Issues = append(r.Issues, Issue{
-			fmt.Sprintf("DISK CRITICAL: %s is %.0f%% full, only %s free of %s.", mediaWin, pctUsed, ui.FmtSize(free), ui.FmtSize(total)),
+		r.Issues = append(r.Issues, Issue{Description:
+			fmt.Sprintf("DISK CRITICAL: %s is %.0f%% full, only %s free of %s.", label, pctUsed, ui.FmtSize(free), ui.FmtSize(total)),
 		})
-		fmt.Printf("  %s %s  %s — %s free / %s\n", ui.Err("✗"), mediaWin, ui.Err(fmt.Sprintf("%.0f%% used", pctUsed)), ui.FmtSize(free), ui.FmtSize(total))
+		fmt.Printf("  %s %s  %s — %s free / %s\n", ui.Err("✗"), label, ui.Err(fmt.Sprintf("%.0f%% used", pctUsed)), ui.FmtSize(free), ui.FmtSize(total))
 	} else if pctUsed > 85 {
-		r.Issues = append(r.Issues, Issue{
-			fmt.Sprintf("DISK LOW: %s is %.0f%% full, %s free of %s.", mediaWin, pctUsed, ui.FmtSize(free), ui.FmtSize(total)),
+		r.Issues = append(r.Issues, Issue{Description:
+			fmt.Sprintf("DISK LOW: %s is %.0f%% full, %s free of %s.", label, pctUsed, ui.FmtSize(free), ui.FmtSize(total)),
 		})
-		fmt.Printf("  %s %s  %s — %s free / %s\n", ui.Warn("!"), mediaWin, ui.Warn(fmt.Sprintf("%.0f%% used", pctUsed)), ui.FmtSize(free), ui.FmtSize(total))
+		fmt.Printf("  %s %s  %s — %s free / %s\n", ui.Warn("!"), label, ui.Warn(fmt.Sprintf("%.0f%% used", pctUsed)), ui.FmtSize(free), ui.FmtSize(total))
 	} else {
 		r.ChecksPassed++
-		fmt.Printf("  %s %s  %s — %s free / %s\n", ui.Ok("✓"), mediaWin, ui.Ok(fmt.Sprintf("%.0f%% used", pctUsed)), ui.FmtSize(free), ui.FmtSize(total))
+		fmt.Printf("  %s %s  %s — %s free / %s\n", ui.Ok("✓"), label, ui.Ok(fmt.Sprintf("%.0f%% used", pctUsed)), ui.FmtSize(free), ui.FmtSize(total))
 	}
 }
 
+// checkMediaPaths validates the download pipeline wiring by cross-checking
+// actual configurations from each service API:
+//   - Radarr/Sonarr root folders (where media ends up)
+//   - Radarr/Sonarr download client config (how they talk to qBit)
+//   - qBittorrent categories + save paths (where downloads land)
+//
+// No hardcoded paths — everything is discovered from the APIs.
 func checkMediaPaths(r *Result) {
-	fmt.Println(ui.Bold("\n  Media Paths"))
+	fmt.Println(ui.Bold("\n  Download Pipeline"))
 	fmt.Println(ui.Separator())
 
-	mediaWSL := config.MediaPathWSL()
-	folders := []string{"Movies", "TV Shows", "Downloads", "Downloads/movies", "Downloads/tv"}
-
-	for _, folder := range folders {
-		path := filepath.Join(mediaWSL, folder)
-		if info, err := os.Stat(path); err == nil && info.IsDir() {
-			r.ChecksPassed++
-			fmt.Printf("  %s %s\n", ui.Ok("✓"), path)
-		} else {
-			// Check for case-insensitive match
-			parent := filepath.Dir(path)
-			basename := filepath.Base(path)
-			var caseMatch string
-			if entries, err := os.ReadDir(parent); err == nil {
-				for _, e := range entries {
-					if strings.EqualFold(e.Name(), basename) && e.Name() != basename {
-						caseMatch = filepath.Join(parent, e.Name())
-						break
-					}
-				}
-			}
-
-			if caseMatch != "" {
-				r.ChecksPassed++
-				r.Issues = append(r.Issues, Issue{
-					fmt.Sprintf("PATH CASE MISMATCH: Expected '%s' but found '%s' (different case).", path, caseMatch),
-				})
-				fmt.Printf("  %s %s %s %s\n", ui.Warn("!"), path, ui.Warn("→"), ui.Dim("found as: "+filepath.Base(caseMatch)))
-			} else {
-				r.Issues = append(r.Issues, Issue{
-					fmt.Sprintf("PATH MISSING: Directory '%s' does not exist. Fix: mkdir -p \"%s\".", path, path),
-				})
-				fmt.Printf("  %s %s %s\n", ui.Err("✗"), path, ui.Err("missing"))
-			}
-		}
+	qbitReachable := api.CheckReachable("qbittorrent")
+	var qbitPrefs *qbit.Preferences
+	var qbitCats map[string]qbit.Category
+	if qbitReachable {
+		qc := qbit.New()
+		qbitPrefs, _ = qc.Preferences()
+		qbitCats, _ = qc.Categories()
 	}
-}
-
-func checkRootFolders(r *Result) {
-	fmt.Println(ui.Bold("\n  Root Folders"))
-	fmt.Println(ui.Separator())
 
 	for _, item := range []struct {
-		svc      string
-		expected string
+		svc           string
+		categoryField string
+		label         string
 	}{
-		{"radarr", "Movies"},
-		{"sonarr", "TV Shows"},
+		{"radarr", "movieCategory", "Movies"},
+		{"sonarr", "tvCategory", "TV"},
 	} {
-		ver := config.ServiceAPIVer(item.svc)
-		var roots []struct {
-			Path       string `json:"path"`
-			Accessible bool   `json:"accessible"`
-			FreeSpace  int64  `json:"freeSpace"`
+		if !api.CheckReachable(item.svc) {
+			fmt.Printf("  %s [%s] %s\n", ui.Dim("—"), item.svc, ui.Dim("not reachable — skipping pipeline check"))
+			continue
 		}
-		if err := api.GetJSON(item.svc, fmt.Sprintf("api/%s/rootfolder", ver), nil, &roots); err == nil {
-			for _, root := range roots {
-				if root.Accessible {
-					r.ChecksPassed++
-					fmt.Printf("  %s %s %s  %s\n", ui.Ok("✓"), ui.Dim("["+item.svc+"]"), root.Path, ui.Dim(ui.FmtSize(root.FreeSpace)+" free"))
-				} else {
-					wslEquiv := strings.ReplaceAll(root.Path, "\\", "/")
-					if strings.HasPrefix(wslEquiv, "D:") {
-						wslEquiv = "/mnt/d" + wslEquiv[2:]
-					} else if strings.HasPrefix(wslEquiv, "C:") {
-						wslEquiv = "/mnt/c" + wslEquiv[2:]
-					}
-					r.Issues = append(r.Issues, Issue{
-						fmt.Sprintf("ROOT FOLDER INACCESSIBLE: %s root folder '%s' is not accessible. WSL equivalent: %s.", item.svc, root.Path, wslEquiv),
-					})
-					fmt.Printf("  %s %s %s %s %s\n", ui.Err("✗"), ui.Dim("["+item.svc+"]"), root.Path, ui.Err("inaccessible"), ui.Dim("→ "+wslEquiv))
-				}
+
+		client := arr.New(item.svc)
+
+		// 1. Get root folders from service
+		roots, err := client.RootFolders()
+		if err != nil || len(roots) == 0 {
+			r.Issues = append(r.Issues, Issue{Description:
+				fmt.Sprintf("NO ROOT FOLDER: %s has no root folders configured. Add one in %s Settings → Media Management.", item.svc, item.svc),
+			})
+			fmt.Printf("  %s [%s] %s\n", ui.Err("✗"), item.svc, ui.Err("no root folder"))
+			continue
+		}
+
+		for _, root := range roots {
+			if root.Accessible {
+				fmt.Printf("  %s [%s] root folder: %s\n", ui.Ok("✓"), item.svc, root.Path)
+				r.ChecksPassed++
+			} else {
+				r.Issues = append(r.Issues, Issue{Description:
+					fmt.Sprintf("ROOT FOLDER INACCESSIBLE: %s root folder '%s' is not accessible. Check volume mounts or permissions.", item.svc, root.Path),
+				})
+				fmt.Printf("  %s [%s] root folder: %s %s\n", ui.Err("✗"), item.svc, root.Path, ui.Err("inaccessible"))
 			}
+		}
+
+		// 2. Get download client config from service
+		dcs, err := client.DownloadClients()
+		if err != nil {
+			continue
+		}
+
+		var qbitDC *arr.DownloadClient
+		for i := range dcs {
+			if dcs[i].Implementation == "QBittorrent" {
+				qbitDC = &dcs[i]
+				break
+			}
+		}
+
+		if qbitDC == nil {
+			r.Issues = append(r.Issues, Issue{Description:
+				fmt.Sprintf("NO DOWNLOAD CLIENT: %s has no qBittorrent client. Add in Settings → Download Clients.", item.svc),
+			})
+			fmt.Printf("  %s [%s] %s\n", ui.Err("✗"), item.svc, ui.Err("no qBittorrent download client"))
+			continue
+		}
+
+		dcHost := fmt.Sprintf("%v", qbitDC.GetField("host"))
+		dcPort := fmt.Sprintf("%v", qbitDC.GetField("port"))
+		dcCategory := ""
+		if v := qbitDC.GetField(item.categoryField); v != nil {
+			dcCategory = fmt.Sprintf("%v", v)
+		}
+
+		if !qbitDC.Enable {
+			r.Issues = append(r.Issues, Issue{Description:
+				fmt.Sprintf("DOWNLOAD CLIENT DISABLED: %s qBittorrent client is disabled.", item.svc),
+			})
+			fmt.Printf("  %s [%s] download client: %s:%s %s\n", ui.Err("✗"), item.svc, dcHost, dcPort, ui.Err("disabled"))
+			continue
+		}
+
+		fmt.Printf("  %s [%s] download client: %s:%s (category: %s)\n",
+			ui.Ok("✓"), item.svc, dcHost, dcPort, dcCategory)
+		r.ChecksPassed++
+
+		// 3. Cross-validate: does the qBit category exist and point somewhere sensible?
+		if qbitReachable && qbitCats != nil && dcCategory != "" {
+			if cat, ok := qbitCats[dcCategory]; ok {
+				fmt.Printf("  %s [%s] qBit category '%s' → %s\n", ui.Ok("✓"), item.svc, dcCategory, cat.SavePath)
+				r.ChecksPassed++
+			} else {
+				r.Issues = append(r.Issues, Issue{Description:
+					fmt.Sprintf("CATEGORY MISSING IN QBIT: %s expects category '%s' but it doesn't exist in qBittorrent. Run admirarr setup to create it.", item.svc, dcCategory),
+				})
+				fmt.Printf("  %s [%s] qBit category '%s' %s\n", ui.Err("✗"), item.svc, dcCategory, ui.Err("not found in qBittorrent"))
+			}
+		}
+	}
+
+	// Show qBit default save path for reference
+	if qbitPrefs != nil {
+		fmt.Printf("  %s qBittorrent default save path: %s\n", ui.Dim("ℹ"), qbitPrefs.SavePath)
+	}
+}
+
+// checkRootFolders is now handled by checkMediaPaths which cross-validates
+// root folders against the full download pipeline. Kept as a no-op for
+// backward compatibility with any external callers.
+func checkRootFolders(r *Result) {
+	// Root folder checks are now part of checkMediaPaths (Download Pipeline)
+}
+
+// checkQualityConfig verifies that quality profiles and custom formats are
+// configured in *Arr services. Detects Recyclarr and reports its status.
+func checkQualityConfig(r *Result) {
+	fmt.Println(ui.Bold("\n  Quality & Custom Formats"))
+	fmt.Println(ui.Separator())
+
+	// Detect Recyclarr
+	rt := recyclarr.Detect()
+	switch rt.Method {
+	case "native":
+		r.ChecksPassed++
+		fmt.Printf("  %s Recyclarr installed: %s %s\n", ui.Ok("✓"), rt.Path, ui.Dim(rt.Version))
+	case "docker":
+		r.ChecksPassed++
+		fmt.Printf("  %s Recyclarr (Docker): %s %s\n", ui.Ok("✓"), rt.Path, ui.Dim(rt.Version))
+	default:
+		r.Issues = append(r.Issues, Issue{
+			Description: "RECYCLARR NOT INSTALLED: Recyclarr syncs TRaSH Guides quality profiles and custom formats to Radarr/Sonarr",
+			Category:    "deploy",
+			Service:     "recyclarr",
+		})
+		fmt.Printf("  %s Recyclarr: %s\n", ui.Warn("!"), ui.Warn("not installed (run 'admirarr doctor --fix' to deploy)"))
+	}
+
+	// Verify quality profiles via APIs (works regardless of Recyclarr)
+	results := recyclarr.Verify("radarr", "sonarr")
+	for _, v := range results {
+		if len(v.Issues) > 0 {
+			for _, issue := range v.Issues {
+				fmt.Printf("  %s [%s] %s\n", ui.Err("✗"), v.Service, issue)
+			}
+			continue
+		}
+
+		profileInfo := fmt.Sprintf("%d profiles", v.QualityProfiles)
+		formatInfo := fmt.Sprintf("%d custom formats", v.CustomFormats)
+
+		if v.CustomFormats > 0 {
+			r.ChecksPassed++
+			fmt.Printf("  %s [%s] %s, %s\n", ui.Ok("✓"), v.Service, profileInfo, formatInfo)
 		} else {
-			fmt.Printf("  %s %s %s\n", ui.Dim("—"), ui.Dim("["+item.svc+"]"), ui.Dim("cannot check (service down)"))
+			r.Issues = append(r.Issues, Issue{
+				Description: fmt.Sprintf("NO CUSTOM FORMATS: [%s] %s, %s — consider running Recyclarr to apply TRaSH Guides", v.Service, profileInfo, formatInfo),
+				Category:    "quality",
+				Service:     v.Service,
+			})
+			fmt.Printf("  %s [%s] %s, %s %s\n", ui.Warn("!"), v.Service, profileInfo, formatInfo,
+				ui.Dim("(run 'admirarr doctor --fix' or 'admirarr recyclarr sync')"))
 		}
 	}
 }
@@ -426,22 +680,14 @@ func checkIndexers(r *Result) {
 	fmt.Println(ui.Bold("\n  Indexers"))
 	fmt.Println(ui.Separator())
 
-	var indexers []struct {
-		ID     int    `json:"id"`
-		Name   string `json:"name"`
-		Enable bool   `json:"enable"`
-	}
-	if err := api.GetJSON("prowlarr", "api/v1/indexer", nil, &indexers); err != nil {
+	client := arr.New("prowlarr")
+	indexers, err := client.Indexers()
+	if err != nil {
 		fmt.Printf("  %s %s\n", ui.Dim("—"), ui.Dim("Cannot check (Prowlarr down)"))
 		return
 	}
 
-	var statuses []struct {
-		IndexerID         int    `json:"indexerId"`
-		MostRecentFailure string `json:"mostRecentFailure"`
-		DisabledTill      string `json:"disabledTill"`
-	}
-	_ = api.GetJSON("prowlarr", "api/v1/indexerstatus", nil, &statuses)
+	statuses, _ := client.IndexerStatuses()
 
 	failedMap := make(map[int]string)
 	for _, s := range statuses {
@@ -466,7 +712,7 @@ func checkIndexers(r *Result) {
 		fmt.Printf("  %s %d indexer(s) healthy: %s\n", ui.Ok("✓"), len(healthy), strings.Join(healthy, ", "))
 	}
 	if len(failing) > 0 {
-		r.Issues = append(r.Issues, Issue{
+		r.Issues = append(r.Issues, Issue{Description:
 			fmt.Sprintf("INDEXERS FAILING: %d indexer(s) failing: %s. Check Prowlarr.", len(failing), strings.Join(failing, ", ")),
 		})
 		fmt.Printf("  %s %d failing: %s\n", ui.Err("✗"), len(failing), strings.Join(failing, ", "))
@@ -480,35 +726,34 @@ func checkServiceWarnings(r *Result) {
 	fmt.Println(ui.Bold("\n  Service Warnings"))
 	fmt.Println(ui.Separator())
 
+	// Check health endpoints on all *arr services that have an API version
 	found := false
-	for _, svc := range []string{"radarr", "sonarr", "prowlarr"} {
-		ver := config.ServiceAPIVer(svc)
-		var data []struct {
-			Type    string `json:"type"`
-			Message string `json:"message"`
-			WikiURL string `json:"wikiUrl"`
-			Source  string `json:"source"`
+	for _, name := range config.AllServiceNames() {
+		ver := config.ServiceAPIVer(name)
+		if ver == "" {
+			continue
 		}
-		if err := api.GetJSON(svc, fmt.Sprintf("api/%s/health", ver), nil, &data); err == nil && len(data) > 0 {
-			for _, item := range data {
+		items, err := arr.New(name).Health()
+		if err == nil && len(items) > 0 {
+			for _, item := range items {
 				found = true
 				level := ui.Warn("WARN")
 				if item.Type == "error" {
 					level = ui.Err("ERROR")
 				}
-				fmt.Printf("  %s %s %s\n", level, ui.Dim("["+svc+"]"), item.Message)
+				fmt.Printf("  %s %s %s\n", level, ui.Dim("["+name+"]"), item.Message)
 				if item.WikiURL != "" {
 					fmt.Printf("         %s\n", ui.Dim(item.WikiURL))
 				}
-				r.Issues = append(r.Issues, Issue{
-					fmt.Sprintf("HEALTH WARNING [%s] (%s): %s. Service: http://%s:%d/",
-						svc, item.Type, item.Message, config.ServiceHost(svc), config.ServicePort(svc)),
+				r.Issues = append(r.Issues, Issue{Description:
+					fmt.Sprintf("HEALTH WARNING [%s] (%s): %s",
+						name, item.Type, item.Message),
 				})
 			}
 		}
 	}
 	if !found {
 		r.ChecksPassed++
-		fmt.Printf("  %s No warnings from Radarr, Sonarr, or Prowlarr\n", ui.Ok("✓"))
+		fmt.Printf("  %s No warnings from *Arr services\n", ui.Ok("✓"))
 	}
 }

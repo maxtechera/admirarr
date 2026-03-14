@@ -4,9 +4,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"time"
 
-	"github.com/maxtechera/admirarr/internal/api"
+	"github.com/maxtechera/admirarr/internal/arr"
 	"github.com/maxtechera/admirarr/internal/ui"
 	"github.com/spf13/cobra"
 )
@@ -32,45 +31,58 @@ func init() {
 
 func runSearch(cmd *cobra.Command, args []string) {
 	query := strings.Join(args, " ")
-	ui.PrintBanner()
-	fmt.Printf("%s\n", ui.Bold(fmt.Sprintf("\n  Prowlarr Search: %s\n", query)))
 
-	var data []struct {
-		Title   string `json:"title"`
-		Size    int64  `json:"size"`
-		Seeders int    `json:"seeders"`
-		Indexer string `json:"indexer"`
-	}
-	params := map[string]string{"query": query, "type": "search"}
-	if err := api.GetJSON("prowlarr", "api/v1/search", params, &data, 30*time.Second); err != nil {
-		fmt.Printf("  %s\n", ui.Err("No results or cannot reach Prowlarr"))
-		return
-	}
-	if len(data) == 0 {
-		fmt.Printf("  %s\n", ui.Dim("No results"))
+	data, err := arr.New("prowlarr").Search(query)
+	if err != nil {
+		if ui.IsJSON() {
+			ui.PrintJSON(map[string]string{"error": "No results or cannot reach Prowlarr"})
+		} else {
+			ui.PrintBanner()
+			fmt.Printf("%s\n", ui.Bold(fmt.Sprintf("\n  Prowlarr Search: %s\n", query)))
+			fmt.Printf("  %s\n", ui.Err("No results or cannot reach Prowlarr"))
+		}
 		return
 	}
 
 	sort.Slice(data, func(i, j int) bool { return data[i].Seeders > data[j].Seeders })
 
-	limit := 15
-	if len(data) < limit {
-		limit = len(data)
+	type searchOut struct {
+		Title   string `json:"title"`
+		Size    int64  `json:"size"`
+		Seeders int    `json:"seeders"`
+		Indexer string `json:"indexer"`
 	}
-	for i, r := range data[:limit] {
-		title := r.Title
-		if len(title) > 70 {
-			title = title[:70]
-		}
-		size := ui.FmtSize(r.Size)
-		seedColor := ui.Err
-		if r.Seeders > 10 {
-			seedColor = ui.Ok
-		} else if r.Seeders > 0 {
-			seedColor = ui.Warn
-		}
-		fmt.Printf("  %s %s\n", ui.Dim(fmt.Sprintf("%2d.", i+1)), title)
-		fmt.Printf("      %s | %s | Seeds: %s\n", ui.Dim(r.Indexer), size, seedColor(fmt.Sprintf("%d", r.Seeders)))
+	var out []searchOut
+	for _, r := range data {
+		out = append(out, searchOut{Title: r.Title, Size: r.Size, Seeders: r.Seeders, Indexer: r.Indexer})
 	}
-	fmt.Println()
+
+	ui.PrintOrJSON(out, func() {
+		ui.PrintBanner()
+		fmt.Printf("%s\n", ui.Bold(fmt.Sprintf("\n  Prowlarr Search: %s\n", query)))
+		if len(data) == 0 {
+			fmt.Printf("  %s\n", ui.Dim("No results"))
+			return
+		}
+		limit := 15
+		if len(data) < limit {
+			limit = len(data)
+		}
+		for i, r := range data[:limit] {
+			title := r.Title
+			if len(title) > 70 {
+				title = title[:70]
+			}
+			size := ui.FmtSize(r.Size)
+			seedColor := ui.Err
+			if r.Seeders > 10 {
+				seedColor = ui.Ok
+			} else if r.Seeders > 0 {
+				seedColor = ui.Warn
+			}
+			fmt.Printf("  %s %s\n", ui.Dim(fmt.Sprintf("%2d.", i+1)), title)
+			fmt.Printf("      %s | %s | Seeds: %s\n", ui.Dim(r.Indexer), size, seedColor(fmt.Sprintf("%d", r.Seeders)))
+		}
+		fmt.Println()
+	})
 }

@@ -16,212 +16,303 @@ import (
 func Detect(state *SetupState) StepResult {
 	r := StepResult{Name: "Environment Detection"}
 
-	fmt.Println(ui.Bold("\n  Phase 1 — Environment Detection"))
-	fmt.Println(ui.Separator())
+	// 1. Detect data path
+	detectDataPath(state, &r)
 
-	// 1. Detect Windows host IP
-	detectHost(state, &r)
+	// 2. Detect timezone
+	detectTimezone(state, &r)
 
-	// 2. Detect media path
-	detectMediaPath(state, &r)
+	// 3. Detect compose directory
+	detectComposeDir(state, &r)
 
-	// 3. Detect installed services
+	// 4. Detect config directory
+	detectConfigDir(state, &r)
+
+	// 5. Detect Remote host IP (WSL2)
+	detectRemoteHost(state, &r)
+
+	// 6. Detect installed services via Docker
 	detectServices(state, &r)
 
 	return r
 }
 
-func detectHost(state *SetupState, r *StepResult) {
-	currentHost := config.Host()
+func detectDataPath(state *SetupState, r *StepResult) {
+	currentPath := config.DataPath()
 
-	// Try /etc/resolv.conf nameserver (WSL2 pattern)
-	detected := ""
-	data, err := os.ReadFile("/etc/resolv.conf")
-	if err == nil {
-		for _, line := range strings.Split(string(data), "\n") {
-			line = strings.TrimSpace(line)
-			if strings.HasPrefix(line, "nameserver") {
-				parts := strings.Fields(line)
-				if len(parts) >= 2 {
-					detected = parts[1]
-					break
-				}
-			}
-		}
+	if state.AutoMode {
+		state.DataPath = currentPath
+		fmt.Printf("  %s Data path: %s\n", ui.Ok("✓"), state.DataPath)
+		r.pass()
+		return
 	}
 
-	// The resolv.conf IP is the WSL gateway, not necessarily the Windows host.
-	// The current config default (192.168.50.42) is likely the actual Windows LAN IP.
-	// Confirm with user.
-	if detected != "" && detected != currentHost {
-		fmt.Printf("  %s Detected gateway: %s (current config: %s)\n", ui.Dim("?"), detected, currentHost)
-	}
-
-	var host string
 	var confirm bool
 	form := huh.NewForm(
 		huh.NewGroup(
 			huh.NewConfirm().
-				Title(fmt.Sprintf("Windows host IP is %s — correct?", currentHost)).
+				Title(fmt.Sprintf("Data path is %s — correct?", currentPath)).
 				Value(&confirm),
 		),
 	)
 	if err := form.Run(); err != nil {
-		state.Host = currentHost
+		state.DataPath = currentPath
 		r.pass()
 		return
 	}
 
 	if confirm {
-		host = currentHost
+		state.DataPath = currentPath
 	} else {
+		var path string
 		form = huh.NewForm(
 			huh.NewGroup(
 				huh.NewInput().
-					Title("Enter Windows host IP").
-					Placeholder("192.168.x.x").
-					Value(&host),
-			),
-		)
-		if err := form.Run(); err != nil || host == "" {
-			host = currentHost
-		}
-	}
-
-	state.Host = host
-	fmt.Printf("  %s Host: %s\n", ui.Ok("✓"), state.Host)
-	r.pass()
-}
-
-func detectMediaPath(state *SetupState, r *StepResult) {
-	currentWSL := config.MediaPathWSL()
-	currentWin := config.MediaPathWin()
-
-	// Scan /mnt for media directories
-	var candidates []string
-	entries, err := os.ReadDir("/mnt")
-	if err == nil {
-		for _, e := range entries {
-			if !e.IsDir() || len(e.Name()) != 1 {
-				continue // only single-letter mount points (c, d, e, ...)
-			}
-			mediaPath := filepath.Join("/mnt", e.Name(), "Media")
-			if info, err := os.Stat(mediaPath); err == nil && info.IsDir() {
-				candidates = append(candidates, mediaPath)
-			}
-		}
-	}
-
-	// Check if current config path is valid
-	if _, err := os.Stat(currentWSL); err == nil {
-		found := false
-		for _, c := range candidates {
-			if c == currentWSL {
-				found = true
-				break
-			}
-		}
-		if !found {
-			candidates = append([]string{currentWSL}, candidates...)
-		}
-	}
-
-	if len(candidates) == 1 {
-		state.MediaWSL = candidates[0]
-	} else if len(candidates) > 1 {
-		options := make([]huh.Option[string], len(candidates))
-		for i, c := range candidates {
-			options[i] = huh.NewOption(c, c)
-		}
-		var selected string
-		form := huh.NewForm(
-			huh.NewGroup(
-				huh.NewSelect[string]().
-					Title("Select media path").
-					Options(options...).
-					Value(&selected),
-			),
-		)
-		if err := form.Run(); err != nil || selected == "" {
-			state.MediaWSL = currentWSL
-		} else {
-			state.MediaWSL = selected
-		}
-	} else {
-		// No candidates found
-		var path string
-		form := huh.NewForm(
-			huh.NewGroup(
-				huh.NewInput().
-					Title("Enter media path (WSL)").
-					Placeholder("/mnt/d/Media").
+					Title("Enter data path (Docker volume root)").
+					Placeholder("/data").
 					Value(&path),
 			),
 		)
 		if err := form.Run(); err != nil || path == "" {
-			state.MediaWSL = currentWSL
-		} else {
-			state.MediaWSL = path
+			path = currentPath
+		}
+		state.DataPath = path
+	}
+
+	fmt.Printf("  %s Data path: %s\n", ui.Ok("✓"), state.DataPath)
+	r.pass()
+}
+
+func detectTimezone(state *SetupState, r *StepResult) {
+	tz := os.Getenv("TZ")
+	if tz == "" {
+		if data, err := os.ReadFile("/etc/timezone"); err == nil {
+			tz = strings.TrimSpace(string(data))
 		}
 	}
-
-	// Derive Windows path from WSL path
-	// /mnt/d/Media -> D:\Media
-	if strings.HasPrefix(state.MediaWSL, "/mnt/") && len(state.MediaWSL) > 6 {
-		drive := strings.ToUpper(string(state.MediaWSL[5]))
-		rest := strings.ReplaceAll(state.MediaWSL[6:], "/", `\`)
-		state.MediaWin = drive + ":" + rest
-	} else {
-		state.MediaWin = currentWin
+	if tz == "" {
+		tz = "UTC"
 	}
 
-	fmt.Printf("  %s Media: %s (%s)\n", ui.Ok("✓"), state.MediaWSL, state.MediaWin)
+	if state.AutoMode {
+		state.Timezone = tz
+		fmt.Printf("  %s Timezone: %s\n", ui.Ok("✓"), state.Timezone)
+		r.pass()
+		return
+	}
+
+	var confirm bool
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewConfirm().
+				Title(fmt.Sprintf("Timezone is %s — correct?", tz)).
+				Value(&confirm),
+		),
+	)
+	if err := form.Run(); err != nil {
+		state.Timezone = tz
+		r.pass()
+		return
+	}
+
+	if confirm {
+		state.Timezone = tz
+	} else {
+		var input string
+		form = huh.NewForm(
+			huh.NewGroup(
+				huh.NewInput().
+					Title("Enter timezone (e.g. America/New_York)").
+					Placeholder("UTC").
+					Value(&input),
+			),
+		)
+		if err := form.Run(); err != nil || input == "" {
+			input = tz
+		}
+		state.Timezone = input
+	}
+
+	fmt.Printf("  %s Timezone: %s\n", ui.Ok("✓"), state.Timezone)
+	r.pass()
+}
+
+func detectComposeDir(state *SetupState, r *StepResult) {
+	defaultDir := filepath.Join(os.Getenv("HOME"), "docker")
+
+	if state.AutoMode {
+		state.ComposeDir = defaultDir
+		fmt.Printf("  %s Compose dir: %s\n", ui.Ok("✓"), state.ComposeDir)
+		r.pass()
+		return
+	}
+
+	var confirm bool
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewConfirm().
+				Title(fmt.Sprintf("Compose directory is %s — correct?", defaultDir)).
+				Value(&confirm),
+		),
+	)
+	if err := form.Run(); err != nil {
+		state.ComposeDir = defaultDir
+		r.pass()
+		return
+	}
+
+	if confirm {
+		state.ComposeDir = defaultDir
+	} else {
+		var input string
+		form = huh.NewForm(
+			huh.NewGroup(
+				huh.NewInput().
+					Title("Enter compose directory").
+					Placeholder(defaultDir).
+					Value(&input),
+			),
+		)
+		if err := form.Run(); err != nil || input == "" {
+			input = defaultDir
+		}
+		state.ComposeDir = input
+	}
+
+	fmt.Printf("  %s Compose dir: %s\n", ui.Ok("✓"), state.ComposeDir)
+	r.pass()
+}
+
+func detectConfigDir(state *SetupState, r *StepResult) {
+	defaultDir := filepath.Join(state.ComposeDir, "config")
+
+	if state.AutoMode {
+		state.ConfigDir = defaultDir
+		fmt.Printf("  %s Config dir: %s\n", ui.Ok("✓"), state.ConfigDir)
+		r.pass()
+		return
+	}
+
+	var confirm bool
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewConfirm().
+				Title(fmt.Sprintf("Config directory is %s — correct?", defaultDir)).
+				Value(&confirm),
+		),
+	)
+	if err := form.Run(); err != nil {
+		state.ConfigDir = defaultDir
+		r.pass()
+		return
+	}
+
+	if confirm {
+		state.ConfigDir = defaultDir
+	} else {
+		var input string
+		form = huh.NewForm(
+			huh.NewGroup(
+				huh.NewInput().
+					Title("Enter config directory").
+					Placeholder(defaultDir).
+					Value(&input),
+			),
+		)
+		if err := form.Run(); err != nil || input == "" {
+			input = defaultDir
+		}
+		state.ConfigDir = input
+	}
+
+	fmt.Printf("  %s Config dir: %s\n", ui.Ok("✓"), state.ConfigDir)
 	r.pass()
 }
 
 func detectServices(state *SetupState, r *StepResult) {
-	// Initialize from config defaults
-	for _, name := range config.AllServiceNames() {
-		svc := config.Get().Services[name]
-		host := svc.Host
-		if host == "" || host == config.Host() {
-			host = state.Host
-		}
-		state.Services[name] = &ServiceState{
-			Host: host,
-			Port: svc.Port,
-			Type: svc.Type,
-		}
+	// Initialize from selected services (Phase 0)
+	selected := state.SelectedServices
+	if len(selected) == 0 {
+		selected = config.AllServiceNames()
 	}
 
-	// Detect Windows processes
-	out, err := exec.Command("/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
-		"-Command", "Get-Process | Select-Object Name | Format-Table -HideTableHeaders").Output()
-	if err == nil {
-		procs := strings.ToLower(string(out))
-		winProcs := map[string]string{
-			"sonarr": "sonarr", "radarr": "radarr", "prowlarr": "prowlarr",
-			"plex": "plex media server", "tautulli": "tautulli", "qbittorrent": "qbittorrent",
+	for _, name := range selected {
+		def, ok := config.GetServiceDef(name)
+		if !ok {
+			continue
 		}
-		for svc, proc := range winProcs {
-			if strings.Contains(procs, proc) {
-				if s, ok := state.Services[svc]; ok {
-					s.Detected = true
-				}
-			}
+		state.Services[name] = &ServiceState{
+			Host: "localhost",
+			Port: def.Port,
 		}
 	}
 
 	// Detect Docker containers
-	out, err = exec.Command("docker", "ps", "-a", "--format", "{{.Names}}").Output()
+	out, err := exec.Command("docker", "ps", "-a", "--format", "{{.Names}}").Output()
 	if err == nil {
 		containers := strings.ToLower(string(out))
-		for _, name := range []string{"seerr", "bazarr", "organizr", "flaresolverr"} {
-			if strings.Contains(containers, name) {
+		for _, name := range selected {
+			container := config.ContainerName(name)
+			if strings.Contains(containers, strings.ToLower(container)) {
 				if s, ok := state.Services[name]; ok {
 					s.Detected = true
+					s.IsDocker = true
 				}
 			}
+		}
+	}
+
+	// Probe all services (Docker, native, remote, Windows) to find reachable
+	// services that aren't Docker containers.
+	probed := config.ProbeAll()
+	for _, name := range selected {
+		s := state.Services[name]
+		if s == nil {
+			continue
+		}
+		ss, ok := probed[name]
+		if !ok {
+			continue
+		}
+		if ss.Up {
+			if !s.Detected {
+				s.Detected = true
+			}
+			s.Reachable = true
+			if ss.Host != "" && ss.Host != "localhost" && ss.Host != "127.0.0.1" {
+				s.Host = ss.Host
+			}
+		}
+	}
+
+	// Auto-add optional services that were found reachable but not selected
+	if state.AutoMode {
+		selectedSet := make(map[string]bool, len(selected))
+		for _, s := range selected {
+			selectedSet[s] = true
+		}
+		for name, ss := range probed {
+			if selectedSet[name] || !ss.Up {
+				continue
+			}
+			def, ok := config.GetServiceDef(name)
+			if !ok || def.Port == 0 {
+				continue
+			}
+			// Add to selected and create state
+			state.SelectedServices = append(state.SelectedServices, name)
+			selectedSet[name] = true
+			svc := &ServiceState{
+				Host:      "localhost",
+				Port:      def.Port,
+				Detected:  true,
+				Reachable: true,
+			}
+			if ss.Host != "" && ss.Host != "localhost" && ss.Host != "127.0.0.1" {
+				svc.Host = ss.Host
+			}
+			state.Services[name] = svc
+			fmt.Printf("  %s %-15s %s\n", ui.GoldText("+"), name, ui.GoldText("auto-added (detected)"))
 		}
 	}
 
@@ -234,10 +325,16 @@ func detectServices(state *SetupState, r *StepResult) {
 
 	fmt.Printf("  %s Detected %d/%d services\n", ui.Ok("✓"), detected, len(state.Services))
 
-	for _, name := range config.AllServiceNames() {
+	for _, name := range state.SelectedServices {
 		s := state.Services[name]
+		if s == nil {
+			continue
+		}
 		status := ui.Ok("✓")
 		label := "detected"
+		if s.Host != "localhost" && s.Host != "" {
+			label = fmt.Sprintf("detected at %s", s.Host)
+		}
 		if !s.Detected {
 			status = ui.Dim("—")
 			label = "not found"
@@ -245,4 +342,37 @@ func detectServices(state *SetupState, r *StepResult) {
 		fmt.Printf("    %s %-15s %s\n", status, name, ui.Dim(label))
 	}
 	r.pass()
+}
+
+func detectRemoteHost(state *SetupState, r *StepResult) {
+	// Check if we're in WSL2 by looking for /mnt/c
+	if _, err := os.Stat("/mnt/c/Windows"); err != nil {
+		return // Not WSL2, skip
+	}
+
+	// Try existing config first
+	host := config.Host()
+	if host != "" && host != "localhost" {
+		state.RemoteHost = host
+		fmt.Printf("  %s Remote host: %s %s\n", ui.Ok("✓"), host, ui.Dim("(from config)"))
+		r.pass()
+		return
+	}
+
+	// Detect via PowerShell
+	out, err := exec.Command("/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
+		"-Command",
+		"(Get-NetIPAddress -AddressFamily IPv4 | Where-Object {($_.InterfaceAlias -notmatch 'Loopback|vEthernet') -and ($_.IPAddress -match '^(10\\.|172\\.(1[6-9]|2[0-9]|3[01])\\.|192\\.168\\.)')} | Select-Object -First 1).IPAddress",
+	).Output()
+	if err == nil {
+		ip := strings.TrimSpace(strings.TrimRight(string(out), "\r\n"))
+		if ip != "" {
+			state.RemoteHost = ip
+			fmt.Printf("  %s Remote host: %s %s\n", ui.Ok("✓"), ip, ui.Dim("(detected via WSL)"))
+			r.pass()
+			return
+		}
+	}
+
+	fmt.Printf("  %s Remote host: %s\n", ui.Dim("—"), ui.Dim("not detected"))
 }

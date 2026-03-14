@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/maxtechera/admirarr/internal/api"
+	"github.com/maxtechera/admirarr/internal/arr"
 	"github.com/maxtechera/admirarr/internal/ui"
 	"github.com/spf13/cobra"
 )
@@ -30,41 +30,62 @@ func init() {
 }
 
 func runShows(cmd *cobra.Command, args []string) {
-	ui.PrintBanner()
-	fmt.Println(ui.Bold("\n  Sonarr — TV Shows\n"))
-
-	var data []struct {
-		Title string `json:"title"`
-		Year  int    `json:"year"`
-		Stats struct {
-			EpisodeFileCount int   `json:"episodeFileCount"`
-			EpisodeCount     int   `json:"episodeCount"`
-			SizeOnDisk       int64 `json:"sizeOnDisk"`
-		} `json:"statistics"`
-	}
-	if err := api.GetJSON("sonarr", "api/v3/series", nil, &data); err != nil {
-		fmt.Printf("  %s\n", ui.Err("Cannot reach Sonarr"))
+	data, err := arr.New("sonarr").Series()
+	if err != nil {
+		if ui.IsJSON() {
+			ui.PrintJSON(map[string]string{"error": "Cannot reach Sonarr"})
+		} else {
+			ui.PrintBanner()
+			fmt.Println(ui.Bold("\n  Sonarr — TV Shows\n"))
+			fmt.Printf("  %s\n", ui.Err("Cannot reach Sonarr"))
+		}
 		return
 	}
 	if len(data) == 0 {
-		fmt.Printf("  %s\n", ui.Dim("No shows added"))
+		if ui.IsJSON() {
+			ui.PrintJSON([]struct{}{})
+		} else {
+			ui.PrintBanner()
+			fmt.Println(ui.Bold("\n  Sonarr — TV Shows\n"))
+			fmt.Printf("  %s\n", ui.Dim("No shows added"))
+		}
 		return
 	}
 
 	sort.Slice(data, func(i, j int) bool { return data[i].Title < data[j].Title })
 
-	for _, s := range data {
-		have := s.Stats.EpisodeFileCount
-		total := s.Stats.EpisodeCount
-		pct := fmt.Sprintf("%d/%d", have, total)
-		colorFn := ui.Err
-		if have == total && total > 0 {
-			colorFn = ui.Ok
-		} else if have > 0 {
-			colorFn = ui.Warn
-		}
-		size := ui.FmtSize(s.Stats.SizeOnDisk)
-		fmt.Printf("  %12s  %s (%d) %s\n", colorFn(pct), s.Title, s.Year, ui.Dim(size))
+	type showOut struct {
+		Title        string `json:"title"`
+		Year         int    `json:"year"`
+		Episodes     int    `json:"episodes"`
+		EpisodeFiles int    `json:"episode_files"`
+		SizeOnDisk   int64  `json:"size_on_disk"`
 	}
-	fmt.Printf("\n  %s\n\n", ui.Dim(fmt.Sprintf("%d shows total", len(data))))
+	var out []showOut
+	for _, s := range data {
+		out = append(out, showOut{
+			Title: s.Title, Year: s.Year,
+			Episodes: s.Statistics.EpisodeCount, EpisodeFiles: s.Statistics.EpisodeFileCount,
+			SizeOnDisk: s.Statistics.SizeOnDisk,
+		})
+	}
+
+	ui.PrintOrJSON(out, func() {
+		ui.PrintBanner()
+		fmt.Println(ui.Bold("\n  Sonarr — TV Shows\n"))
+		for _, s := range data {
+			have := s.Statistics.EpisodeFileCount
+			total := s.Statistics.EpisodeCount
+			pct := fmt.Sprintf("%d/%d", have, total)
+			colorFn := ui.Err
+			if have == total && total > 0 {
+				colorFn = ui.Ok
+			} else if have > 0 {
+				colorFn = ui.Warn
+			}
+			size := ui.FmtSize(s.Statistics.SizeOnDisk)
+			fmt.Printf("  %12s  %s (%d) %s\n", colorFn(pct), s.Title, s.Year, ui.Dim(size))
+		}
+		fmt.Printf("\n  %s\n\n", ui.Dim(fmt.Sprintf("%d shows total", len(data))))
+	})
 }

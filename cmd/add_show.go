@@ -1,12 +1,11 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/huh"
-	"github.com/maxtechera/admirarr/internal/api"
+	"github.com/maxtechera/admirarr/internal/arr"
 	"github.com/maxtechera/admirarr/internal/ui"
 	"github.com/spf13/cobra"
 )
@@ -40,8 +39,10 @@ func runAddShow(cmd *cobra.Command, args []string) {
 	ui.PrintBanner()
 	fmt.Printf("%s\n", ui.Bold(fmt.Sprintf("\n  Search Sonarr: %s\n", query)))
 
-	var results []map[string]interface{}
-	if err := api.GetJSON("sonarr", "api/v3/series/lookup", map[string]string{"term": query}, &results); err != nil || len(results) == 0 {
+	client := arr.New("sonarr")
+
+	results, err := client.LookupSeries(query)
+	if err != nil || len(results) == 0 {
 		fmt.Printf("  %s\n", ui.Err("No results"))
 		return
 	}
@@ -85,19 +86,13 @@ func runAddShow(cmd *cobra.Command, args []string) {
 
 	series := results[selected]
 
-	var roots []struct {
-		ID   int    `json:"id"`
-		Path string `json:"path"`
-	}
-	var profiles []struct {
-		ID   int    `json:"id"`
-		Name string `json:"name"`
-	}
-	if err := api.GetJSON("sonarr", "api/v3/rootfolder", nil, &roots); err != nil || len(roots) == 0 {
+	roots, err := client.RootFolders()
+	if err != nil || len(roots) == 0 {
 		fmt.Printf("  %s\n", ui.Err("Cannot get Sonarr config"))
 		return
 	}
-	if err := api.GetJSON("sonarr", "api/v3/qualityprofile", nil, &profiles); err != nil || len(profiles) == 0 {
+	profiles, err := client.QualityProfiles()
+	if err != nil || len(profiles) == 0 {
 		fmt.Printf("  %s\n", ui.Err("Cannot get Sonarr config"))
 		return
 	}
@@ -110,23 +105,20 @@ func runAddShow(cmd *cobra.Command, args []string) {
 		"monitor":                  "all",
 	}
 
-	respData, err := api.Post("sonarr", "api/v3/series", series, nil)
+	result, err := client.AddSeries(series)
 	if err != nil {
 		fmt.Printf("\n  %s\n\n", ui.Err("Failed to add."))
 		return
 	}
 
-	var result map[string]interface{}
-	if err := json.Unmarshal(respData, &result); err == nil {
-		if _, ok := result["id"]; ok {
-			title, _ := result["title"].(string)
-			year := 0
-			if y, ok := result["year"].(float64); ok {
-				year = int(y)
-			}
-			fmt.Printf("\n  %s %s (%d) — searching...\n\n", ui.Ok("Added:"), title, year)
-			return
+	if _, ok := result["id"]; ok {
+		title, _ := result["title"].(string)
+		year := 0
+		if y, ok := result["year"].(float64); ok {
+			year = int(y)
 		}
+		fmt.Printf("\n  %s %s (%d) — searching...\n\n", ui.Ok("Added:"), title, year)
+		return
 	}
-	fmt.Printf("\n  %s Response: %s\n\n", ui.Err("Failed to add."), string(respData)[:100])
+	fmt.Printf("\n  %s\n\n", ui.Err("Failed to add."))
 }

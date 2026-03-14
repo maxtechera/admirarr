@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/maxtechera/admirarr/internal/api"
-	"github.com/maxtechera/admirarr/internal/config"
+
+	"github.com/maxtechera/admirarr/internal/arr"
 	"github.com/maxtechera/admirarr/internal/ui"
 	"github.com/spf13/cobra"
 )
@@ -27,61 +27,86 @@ func init() {
 }
 
 func runQueue(cmd *cobra.Command, args []string) {
-	ui.PrintBanner()
-	fmt.Println(ui.Bold("\n  Download Queues\n"))
+	type queueItemOut struct {
+		Title string `json:"title"`
+		State string `json:"state"`
+	}
+	type queueOut struct {
+		Radarr []queueItemOut `json:"radarr"`
+		Sonarr []queueItemOut `json:"sonarr"`
+	}
+
+	jsonOut := queueOut{
+		Radarr: []queueItemOut{},
+		Sonarr: []queueItemOut{},
+	}
+
+	type svcData struct {
+		svc   string
+		total int
+		page  *arr.QueuePage
+	}
+	var allData []svcData
 
 	for _, svc := range []string{"radarr", "sonarr"} {
-		ver := config.ServiceAPIVer(svc)
-		var data struct {
-			TotalRecords int `json:"totalRecords"`
-			Records      []struct {
-				Title                string `json:"title"`
-				TrackedDownloadState string `json:"trackedDownloadState"`
-				StatusMessages       []struct {
-					Messages []string `json:"messages"`
-				} `json:"statusMessages"`
-			} `json:"records"`
-		}
-		err := api.GetJSON(svc, fmt.Sprintf("api/%s/queue", ver), map[string]string{"pageSize": "50"}, &data)
+		page, err := arr.New(svc).Queue(50)
 		total := 0
 		if err == nil {
-			total = data.TotalRecords
+			total = page.TotalRecords
+		} else {
+			page = &arr.QueuePage{}
 		}
-		svcTitle := svc
-		if len(svc) > 0 {
-			svcTitle = string(svc[0]-32) + svc[1:]
+		allData = append(allData, svcData{svc: svc, total: total, page: page})
+		for _, rec := range page.Records {
+			item := queueItemOut{Title: rec.Title, State: rec.TrackedDownloadState}
+			if svc == "radarr" {
+				jsonOut.Radarr = append(jsonOut.Radarr, item)
+			} else {
+				jsonOut.Sonarr = append(jsonOut.Sonarr, item)
+			}
 		}
-		fmt.Println(ui.Bold(fmt.Sprintf("  %s (%d items)", svcTitle, total)))
-		if total > 0 {
-			for _, rec := range data.Records {
-				state := rec.TrackedDownloadState
-				colorFn := ui.Err
-				if state == "downloading" {
-					colorFn = ui.Ok
-				} else if state == "importPending" {
-					colorFn = ui.Warn
-				}
-				title := rec.Title
-				if len(title) > 70 {
-					title = title[:70]
-				}
-				fmt.Printf("    %s  %s\n", colorFn(state), title)
-				for _, sm := range rec.StatusMessages {
-					for i, m := range sm.Messages {
-						if i >= 2 {
-							break
+	}
+
+	ui.PrintOrJSON(jsonOut, func() {
+		ui.PrintBanner()
+		fmt.Println(ui.Bold("\n  Download Queues\n"))
+		for _, sd := range allData {
+			svcTitle := sd.svc
+			if len(svcTitle) > 0 {
+				svcTitle = string(sd.svc[0]-32) + sd.svc[1:]
+			}
+			fmt.Println(ui.Bold(fmt.Sprintf("  %s (%d items)", svcTitle, sd.total)))
+			if sd.total > 0 {
+				for _, rec := range sd.page.Records {
+					state := rec.TrackedDownloadState
+					colorFn := ui.Err
+					if state == "downloading" {
+						colorFn = ui.Ok
+					} else if state == "importPending" {
+						colorFn = ui.Warn
+					}
+					title := rec.Title
+					if len(title) > 70 {
+						title = title[:70]
+					}
+					fmt.Printf("    %s  %s\n", colorFn(state), title)
+					for _, sm := range rec.StatusMessages {
+						for i, m := range sm.Messages {
+							if i >= 2 {
+								break
+							}
+							msg := m
+							if len(msg) > 80 {
+								msg = msg[:80]
+							}
+							fmt.Printf("      %s\n", ui.Dim(msg))
 						}
-						msg := m
-						if len(msg) > 80 {
-							msg = msg[:80]
-						}
-						fmt.Printf("      %s\n", ui.Dim(msg))
 					}
 				}
+			} else {
+				fmt.Printf("    %s\n", ui.Dim("Empty"))
 			}
-		} else {
-			fmt.Printf("    %s\n", ui.Dim("Empty"))
+			fmt.Println()
 		}
-		fmt.Println()
-	}
+	})
 }

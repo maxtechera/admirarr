@@ -1,40 +1,67 @@
-# Admirarr — Agent Instructions
+# Admirarr — Agent Reference
 
-## Overview
-
-Admirarr is a Go CLI (Cobra + Charm.sh) for managing a Plex + *Arr media server stack from the terminal.
-
-## Architecture
-
-- **Go 1.24+** with spf13/cobra, spf13/viper, charmbracelet/lipgloss, charmbracelet/huh
-- **Structure**: `main.go` → `cmd/` (20 command files) → `internal/` (api, config, keys, ui, doctor)
-- **Config**: Viper loads `~/.config/admirarr/config.yaml`
-- **API pattern**: `api.GetJSON(service, endpoint, params, &target)`
-
-## Network
-
-- Windows services (Plex:32400, Radarr:7878, Sonarr:8989, Prowlarr:9696, qBittorrent:8080, Tautulli:8181) → `192.168.50.42`
-- Docker containers (Seerr:5055, Bazarr:6767, Organizr:9983, FlareSolverr:8191) → `localhost`
-- Media: `/mnt/d/Media` (WSL) / `D:\Media` (Windows)
+Use `admirarr` as the sole interface. Never bypass with raw API calls, curl, or Docker commands.
 
 ## Commands
 
-```
-admirarr status|doctor|doctor --fix|health|movies|shows|missing|recent|history
-admirarr search|find|add-movie|add-show <query>
-admirarr downloads|queue|indexers|scan|restart|docker|disk|logs
-admirarr completion [bash|zsh|fish|powershell]
-```
-
-## Build & Test
-
 ```bash
-go build -ldflags "-X github.com/maxtechera/admirarr/internal/ui.Version=1.0.0" -o admirarr .
-go test ./...
+# Status
+admirarr status [-o json] [--live]     admirarr health [-o json]
+admirarr disk [-o json]                admirarr docker [-o json]
+
+# Library
+admirarr movies [-o json]              admirarr shows [-o json]
+admirarr recent [-o json]              admirarr history [-o json]
+admirarr missing [-o json]             admirarr requests [-o json]
+
+# Search & Add
+admirarr search "<q>" [-o json]        admirarr find "<q>" [-o json]
+admirarr add-movie "<q>"               admirarr add-show "<q>"
+
+# Downloads
+admirarr downloads [-o json]           admirarr queue [-o json]
+admirarr downloads pause [hash|all]    admirarr downloads resume [hash|all]
+admirarr downloads remove <hash> [--delete-files]
+
+# Indexers
+admirarr indexers [-o json]            admirarr indexers test
+admirarr indexers setup                admirarr indexers sync
+admirarr indexers add <name>           admirarr indexers remove <name>
+
+# Quality
+admirarr recyclarr                     admirarr recyclarr sync [instance]
+admirarr recyclarr verify              admirarr recyclarr instances
+
+# VPN
+admirarr vpn [-o json]                 admirarr vpn setup
+admirarr vpn status [-o json]          admirarr vpn devices [-o json]
+admirarr vpn rotate
+
+# Management
+admirarr scan                          admirarr restart <service>
+admirarr logs <service>
+
+# Diagnostics
+admirarr doctor [-o json]              admirarr doctor --fix
+
+# Stack
+admirarr setup                         admirarr migrate
 ```
 
-## Brand
+## Patterns
 
-- **Name**: Admirarr (admiral + arr)
-- **Tagline**: Command your fleet.
-- **Theme**: Navy + Gold + Cyan, pirate/nautical, octopus mascot
+| Goal | Commands |
+|---|---|
+| Understand stack state | `status` → `doctor` → `health` |
+| Fix an issue | `doctor -o json` → identify → `restart` / fix → `doctor` again |
+| Add content | `movies -o json` (check exists) → `add-movie` → `downloads` → `queue` |
+| Stuck downloads | `downloads -o json` → `queue -o json` → `health` → `doctor` |
+| Missing content | `missing -o json` → `requests -o json` |
+
+## Rules
+
+- `-o json` for structured output when parsing
+- Confirm with user before `restart` or `setup`
+- Never delete user files or media
+- Never modify *Arr databases directly
+- `setup` is idempotent — safe to re-run

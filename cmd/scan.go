@@ -1,29 +1,23 @@
 package cmd
 
 import (
-	"encoding/xml"
 	"fmt"
-	"io"
-	"net/http"
-	"strings"
-	"time"
 
-	"github.com/maxtechera/admirarr/internal/config"
-	"github.com/maxtechera/admirarr/internal/keys"
+	"github.com/maxtechera/admirarr/internal/media"
 	"github.com/maxtechera/admirarr/internal/ui"
 	"github.com/spf13/cobra"
 )
 
 var scanCmd = &cobra.Command{
 	Use:   "scan",
-	Short: "Trigger Plex library scan",
-	Long: `Trigger a Plex library scan across all sections.
+	Short: "Trigger media server library scan",
+	Long: `Trigger a library scan on your media server (Jellyfin or Plex).
 
-Fetches all Plex library sections, then triggers a refresh on each one.
+Auto-detects which media server is running and triggers a scan.
 
 API endpoints used:
-  Plex   GET  /library/sections
-  Plex   POST /library/sections/<id>/refresh`,
+  Jellyfin   POST /Library/Refresh
+  Plex       GET  /library/sections + POST /library/sections/{key}/refresh`,
 	Example: "  admirarr scan",
 	Run:     runScan,
 }
@@ -33,46 +27,41 @@ func init() {
 }
 
 func runScan(cmd *cobra.Command, args []string) {
-	ui.PrintBanner()
-	fmt.Println(ui.Bold("\n  Triggering Plex Library Scan...\n"))
-
-	key := keys.Get("plex")
-	if key == "" {
-		fmt.Printf("  %s\n", ui.Err("No Plex token found"))
-		return
-	}
-
-	sectionsURL := fmt.Sprintf("%s/library/sections?X-Plex-Token=%s", config.ServiceURL("plex"), key)
-	c := &http.Client{Timeout: 5 * time.Second}
-	resp, err := c.Get(sectionsURL)
-	if err != nil {
-		fmt.Printf("  %s\n", ui.Err(fmt.Sprintf("Failed: %v", err)))
-		return
-	}
-	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
-
-	var container struct {
-		Directories []struct {
-			Key   string `xml:"key,attr"`
-			Title string `xml:"title,attr"`
-		} `xml:"Directory"`
-	}
-	if err := xml.Unmarshal(body, &container); err != nil {
-		fmt.Printf("  %s\n", ui.Err(fmt.Sprintf("Failed to parse: %v", err)))
-		return
-	}
-
-	for _, d := range container.Directories {
-		scanURL := fmt.Sprintf("%s/library/sections/%s/refresh?X-Plex-Token=%s",
-			config.ServiceURL("plex"), d.Key, key)
-		req, _ := http.NewRequest("POST", scanURL, strings.NewReader(""))
-		_, err := c.Do(req)
-		if err != nil {
-			fmt.Printf("  %s Failed: %s — %v\n", ui.Err("●"), d.Title, err)
+	server := media.Detect()
+	if server == nil {
+		if ui.IsJSON() {
+			ui.PrintJSON(map[string]string{"status": "error", "message": "No media server found (Jellyfin or Plex)"})
 		} else {
-			fmt.Printf("  %s Scanning: %s\n", ui.Ok("●"), d.Title)
+			ui.PrintBanner()
+			fmt.Printf("  %s\n", ui.Err("No media server found (Jellyfin or Plex)"))
 		}
+		return
 	}
-	fmt.Println()
+
+	results, err := server.LibraryScan()
+	if err != nil && len(results) == 0 {
+		if ui.IsJSON() {
+			ui.PrintJSON(map[string]string{"status": "error", "message": fmt.Sprintf("Failed: %v", err)})
+		} else {
+			ui.PrintBanner()
+			fmt.Printf("%s\n", ui.Bold(fmt.Sprintf("\n  Triggering %s Library Scan...\n", server.Name())))
+			fmt.Printf("  %s\n", ui.Err(fmt.Sprintf("Failed: %v", err)))
+		}
+		return
+	}
+
+	if ui.IsJSON() {
+		ui.PrintJSON(map[string]string{"status": "ok", "message": "Library scan triggered"})
+	} else {
+		ui.PrintBanner()
+		fmt.Printf("%s\n", ui.Bold(fmt.Sprintf("\n  Triggering %s Library Scan...\n", server.Name())))
+		for _, r := range results {
+			if r.OK {
+				fmt.Printf("  %s Library scan triggered: %s\n", ui.Ok("●"), r.Library)
+			} else {
+				fmt.Printf("  %s Scan failed for %s: %v\n", ui.Err("●"), r.Library, r.Err)
+			}
+		}
+		fmt.Println()
+	}
 }

@@ -1,0 +1,173 @@
+name: Publish Agent Skills
+
+on:
+  release:
+    types: [published]
+  push:
+    branches: [main]
+    paths:
+      - "SKILL.md"
+      - "AGENTS.md"
+      - ".claude-plugin/**"
+      - ".claude/agents/**"
+      - ".opencode/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "SKILL.md"
+      - "AGENTS.md"
+      - ".claude-plugin/**"
+      - ".claude/agents/**"
+      - ".opencode/**"
+
+permissions:
+  contents: read
+
+jobs:
+  # ── Validate: runs on every push/PR ──────────────────────────────
+  validate:
+    name: Validate all agent integrations
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── Root SKILL.md — single source of truth for all platforms ──
+      - name: Validate SKILL.md
+        run: |
+          [ -f "SKILL.md" ] || { echo "::error::SKILL.md missing"; exit 1; }
+          head -30 SKILL.md | grep -q "^name:" || { echo "::error::Missing 'name'"; exit 1; }
+          head -30 SKILL.md | grep -q "^description:" || { echo "::error::Missing 'description'"; exit 1; }
+          head -30 SKILL.md | grep -q "^version:" || { echo "::error::Missing 'version'"; exit 1; }
+          echo "✓ SKILL.md valid"
+
+      # ── AGENTS.md ──
+      - name: Validate AGENTS.md
+        run: |
+          [ -f "AGENTS.md" ] || { echo "::error::AGENTS.md missing"; exit 1; }
+          echo "✓ AGENTS.md present"
+
+      # ── Claude Code plugin ──
+      - name: Validate Claude Code plugin
+        run: |
+          for f in .claude-plugin/plugin.json .claude-plugin/marketplace.json; do
+            [ -f "$f" ] || { echo "::error::Missing $f"; exit 1; }
+            python3 -c "import json; json.load(open('$f'))" || exit 1
+          done
+          python3 -c "
+          import json, os, sys
+          plugin = json.load(open('.claude-plugin/plugin.json'))
+          for agent in plugin.get('agents', []):
+              if not os.path.isfile(agent):
+                  print(f'::error::Agent ref not found: {agent}'); sys.exit(1)
+          mp = json.load(open('.claude-plugin/marketplace.json'))
+          if plugin['name'] not in [p['name'] for p in mp.get('plugins', [])]:
+              print('::error::plugin name not in marketplace'); sys.exit(1)
+          print('✓ Claude Code plugin valid')
+          "
+
+      # ── Claude Code agents ──
+      - name: Validate Claude Code agents
+        run: |
+          for f in .claude/agents/doctor-fix.md .claude/agents/fleet-status.md .claude/agents/content-search.md; do
+            [ -f "$f" ] || { echo "::error::Missing $f"; exit 1; }
+            head -10 "$f" | grep -q "^name:" || { echo "::error file=$f::Missing 'name'"; exit 1; }
+          done
+          echo "✓ Claude Code agents valid"
+
+      # ── OpenCode config ──
+      - name: Validate OpenCode config
+        run: |
+          [ -f ".opencode/opencode.jsonc" ] || { echo "::error::Missing .opencode/opencode.jsonc"; exit 1; }
+          sed 's|//.*||' .opencode/opencode.jsonc | python3 -c "
+          import json, sys, os, re
+          data = json.load(sys.stdin)
+          # Validate JSON
+          # Check {file:} refs in agent prompts resolve
+          for name, agent in data.get('agent', {}).items():
+              prompt = agent.get('prompt', '')
+              m = re.match(r'^\{file:(.+)\}$', prompt)
+              if m:
+                  # Resolve relative to .opencode/ dir
+                  ref = os.path.normpath(os.path.join('.opencode', m.group(1)))
+                  if not os.path.isfile(ref):
+                      print(f'::error::OpenCode agent \"{name}\" references missing file: {ref}')
+                      sys.exit(1)
+          print('✓ OpenCode config valid (JSON + file refs)')
+          "
+
+  # ── ClawHub: publish on release ──────────────────────────────────
+  publish-clawhub:
+    name: Publish to ClawHub
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+    needs: validate
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install clawdhub CLI
+        run: npm install -g clawdhub undici
+
+      - name: Publish to ClawHub
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+
+          # Stage root SKILL.md into a temp dir for clawdhub publish
+          SKILL_DIR=$(mktemp -d)
+          cp SKILL.md "$SKILL_DIR/SKILL.md"
+          # Stamp release version into frontmatter
+          sed -i "s/^version: .*/version: $VERSION/" "$SKILL_DIR/SKILL.md"
+
+          clawdhub login --token "${{ secrets.CLAWHUB_TOKEN }}"
+          clawdhub publish "$SKILL_DIR" \
+            --version "$VERSION" \
+            --slug admirarr \
+            --name "Admirarr" \
+            --changelog "${{ github.event.release.body }}" \
+            --no-input
+        env:
+          CLAWDHUB_REGISTRY: https://clawhub.ai
+
+  # ── Version sync: bump version refs on release ───────────────────
+  version-sync:
+    name: Sync versions
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+    needs: validate
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Bump versions
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+
+          # SKILL.md version
+          sed -i "s/^version: .*/version: $VERSION/" SKILL.md
+
+          # Claude Code plugin + marketplace
+          python3 -c "
+          import json
+          for f in ['.claude-plugin/plugin.json', '.claude-plugin/marketplace.json']:
+              data = json.load(open(f))
+              if 'version' in data: data['version'] = '$VERSION'
+              for p in data.get('plugins', []):
+                  if 'version' in p: p['version'] = '$VERSION'
+              json.dump(data, open(f, 'w'), indent=2)
+          "
+
+      - name: Commit version bump
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add SKILL.md .claude-plugin/plugin.json .claude-plugin/marketplace.json
+          git diff --staged --quiet || git commit -m "chore: bump skill version to ${GITHUB_REF_NAME}"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

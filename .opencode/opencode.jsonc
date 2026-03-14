@@ -1,0 +1,45 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  "instructions": [
+    "SKILL.md",
+    "CLAUDE.md"
+  ],
+
+  // Agents — point to .claude/agents/ files, no duplicated prompts
+  "agent": {
+    "doctor-fix": {
+      "description": "Diagnose and fix media server stack issues",
+      "model": "anthropic/claude-sonnet-4-6",
+      "prompt": "{file:../.claude/agents/doctor-fix.md}",
+      "tools": { "write": false }
+    },
+    "fleet-status": {
+      "description": "Quick full-stack status summary",
+      "model": "anthropic/claude-haiku-4-5",
+      "prompt": "{file:../.claude/agents/fleet-status.md}"
+    },
+    "content-search": {
+      "description": "Search for and add movies or TV shows",
+      "model": "anthropic/claude-haiku-4-5",
+      "prompt": "{file:../.claude/agents/content-search.md}"
+    }
+  },
+
+  // Commands
+  "command": {
+    "status": {
+      "template": "Run `admirarr status -o json` and present a clean formatted dashboard.",
+      "description": "Media server stack status dashboard"
+    },
+    "doctor": {
+      "template": "Run `admirarr doctor -o json` and present diagnostics, highlighting failures.",
+      "description": "Run stack diagnostics"
+    },
+    "fix": {
+      "template": "Run `admirarr doctor --fix` then re-run `admirarr doctor -o json` to verify.",
+      "description": "Auto-fix stack issues",
+      "agent": "doctor-fix"
+    }
+  }
+}

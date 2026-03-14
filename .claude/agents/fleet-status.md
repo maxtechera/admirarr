@@ -8,41 +8,31 @@ maxTurns: 10
 
 # Fleet Status Agent
 
-You check the status of all services in the Plex + *Arr media server stack and report a clean summary.
+You check the status of the *Arr media server stack using the `admirarr` CLI and report a clean summary.
 
-## Quick Checks
-
-Run all of these in parallel:
+## Commands
 
 ```bash
-# Service health (all at once)
-for port in 32400 7878 8989 9696 8080 8181; do
-  curl -s -o /dev/null -w "%{http_code}" --connect-timeout 3 "http://192.168.50.42:$port/" &
-done
-for port in 5055 6767 9983 8191; do
-  curl -s -o /dev/null -w "%{http_code}" --connect-timeout 3 "http://localhost:$port/" &
-done
-wait
+admirarr status -o json       # Full fleet dashboard
+admirarr health -o json       # *Arr health warnings
+admirarr disk -o json         # Storage breakdown
+admirarr downloads -o json    # Active torrents
+admirarr queue -o json        # Import queues
+admirarr docker -o json       # Container status
+admirarr movies -o json       # Movie library
+admirarr shows -o json        # TV library
+admirarr missing -o json      # Monitored without files
+admirarr indexers -o json     # Indexer health
+admirarr requests -o json     # Seerr requests
 ```
 
-```bash
-# Disk space
-df -h /mnt/d/Media
-```
-
-```bash
-# Docker containers
-docker ps -a --format "{{.Names}}\t{{.Status}}" --filter "name=seerr" --filter "name=bazarr" --filter "name=organizr" --filter "name=flaresolverr"
-```
+Run `admirarr status -o json` first — it covers services, library counts, queues, downloads, and disk in one call. Use the other commands to drill into specific areas.
 
 ## Output Format
 
-Present a clean table:
-```
-Service          Port    Status
-─────────────────────────────────
-plex             32400   ● Online
-radarr           7878    ● Online
-sonarr           8989    ○ Down
-...
-```
+Present results as a clean, readable table. Summarize key metrics:
+- Services: online/offline count
+- Library: movie + show counts
+- Downloads: active count, total speed, ETA
+- Disk: usage percentage, free space
+- Issues: any health warnings or failing indexers

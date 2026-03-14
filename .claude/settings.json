@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if echo \"$CLAUDE_TOOL_PARAMS\" | grep -q '\\.go\"'; then cd /home/max/nexus-cli && /home/max/go/bin/go build -ldflags '-s -w -X github.com/maxtechera/admirarr/internal/ui.Version=dev' -o admirarr-go . 2>&1 || echo 'BUILD FAILED'; fi",
+            "async": true
+          }
+        ]
+      }
+    ]
+  }
+}

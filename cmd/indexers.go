@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/charmbracelet/huh"
-	"github.com/maxtechera/admirarr/internal/api"
+	"github.com/maxtechera/admirarr/internal/arr"
+	"github.com/maxtechera/admirarr/internal/config"
 	"github.com/maxtechera/admirarr/internal/setup"
 	"github.com/maxtechera/admirarr/internal/ui"
 	"github.com/spf13/cobra"
@@ -129,87 +129,28 @@ func runIndexersSync(cmd *cobra.Command, args []string) {
 		ui.Ok("✓"), r.Passed, ui.GoldText(fmt.Sprintf("%d", r.Fixed)))
 }
 
-// ── Indexer definitions ──
-
-type indexerDef struct {
-	Name           string
-	Category       string // "general", "movies", "tv", "anime"
-	Implementation string
-	ConfigContract string
-	DefinitionFile string // for Cardigann
-	BaseURL        string
-	NeedsFlare     bool
-	ExtraFields    map[string]interface{}
-}
-
-var recommendedIndexers = []indexerDef{
-	// General
-	{Name: "1337x", Category: "general", Implementation: "Cardigann", ConfigContract: "CardigannSettings",
-		DefinitionFile: "1337x", BaseURL: "", NeedsFlare: true},
-	{Name: "The Pirate Bay", Category: "general", Implementation: "Cardigann", ConfigContract: "CardigannSettings",
-		DefinitionFile: "thepiratebay", BaseURL: "https://thepiratebay.org/",
-		ExtraFields: map[string]interface{}{"apiurl": "apibay.org"}},
-	{Name: "TorrentGalaxy", Category: "general", Implementation: "Cardigann", ConfigContract: "CardigannSettings",
-		DefinitionFile: "torrentgalaxyclone", BaseURL: "https://torrentgalaxy.info/"},
-	{Name: "Knaben", Category: "general", Implementation: "Knaben", ConfigContract: "NoAuthTorrentBaseSettings",
-		BaseURL: "https://knaben.org/"},
-
-	// Movies
-	{Name: "YTS", Category: "movies", Implementation: "Cardigann", ConfigContract: "CardigannSettings",
-		DefinitionFile: "yts", BaseURL: ""},
-
-	// TV
-	{Name: "EZTV", Category: "tv", Implementation: "Cardigann", ConfigContract: "CardigannSettings",
-		DefinitionFile: "eztv", BaseURL: ""},
-
-	// Anime
-	{Name: "Nyaa.si", Category: "anime", Implementation: "Cardigann", ConfigContract: "CardigannSettings",
-		DefinitionFile: "nyaasi", BaseURL: "https://nyaa.si/", NeedsFlare: true},
-	{Name: "SubsPlease", Category: "anime", Implementation: "SubsPlease", ConfigContract: "SubsPleaseSettings",
-		BaseURL: ""},
-	{Name: "Anidex", Category: "anime", Implementation: "Anidex", ConfigContract: "AnidexSettings",
-		BaseURL: "https://anidex.info/", NeedsFlare: true,
-		ExtraFields: map[string]interface{}{"authorisedOnly": false}},
-	{Name: "Tokyo Toshokan", Category: "anime", Implementation: "Cardigann", ConfigContract: "CardigannSettings",
-		DefinitionFile: "tokyotosho", BaseURL: "https://www.tokyotosho.info/"},
-}
-
-// ── Prowlarr API types ──
-
-type prowlarrIndexer struct {
-	ID             int                    `json:"id"`
-	Name           string                 `json:"name"`
-	Enable         bool                   `json:"enable"`
-	Implementation string                 `json:"implementation"`
-	Protocol       string                 `json:"protocol"`
-	Tags           []int                  `json:"tags"`
-	Fields         []map[string]interface{} `json:"fields,omitempty"`
-	Capabilities   struct {
-		Categories []struct {
-			Name string `json:"name"`
-		} `json:"categories"`
-	} `json:"capabilities"`
-}
-
-type prowlarrIndexerStatus struct {
-	IndexerID         int    `json:"indexerId"`
-	MostRecentFailure string `json:"mostRecentFailure"`
-}
+// Use config.RecommendedIndexers as the canonical list.
+// Local alias for convenience.
+var recommendedIndexers = config.RecommendedIndexers
 
 // ── List indexers ──
 
 func runIndexers(cmd *cobra.Command, args []string) {
-	ui.PrintBanner()
-	fmt.Println(ui.Bold("\n  Prowlarr — Indexers\n"))
+	client := arr.New("prowlarr")
 
-	var indexers []prowlarrIndexer
-	if err := api.GetJSON("prowlarr", "api/v1/indexer", nil, &indexers); err != nil {
-		fmt.Printf("  %s\n", ui.Err("Cannot reach Prowlarr"))
+	indexers, err := client.Indexers()
+	if err != nil {
+		if ui.IsJSON() {
+			ui.PrintJSON(map[string]string{"error": "Cannot reach Prowlarr"})
+		} else {
+			ui.PrintBanner()
+			fmt.Println(ui.Bold("\n  Prowlarr — Indexers\n"))
+			fmt.Printf("  %s\n", ui.Err("Cannot reach Prowlarr"))
+		}
 		return
 	}
 
-	var statuses []prowlarrIndexerStatus
-	_ = api.GetJSON("prowlarr", "api/v1/indexerstatus", nil, &statuses)
+	statuses, _ := client.IndexerStatuses()
 
 	failedIDs := make(map[int]bool)
 	for _, s := range statuses {
@@ -218,36 +159,56 @@ func runIndexers(cmd *cobra.Command, args []string) {
 		}
 	}
 
+	type indexerOut struct {
+		Name    string `json:"name"`
+		Enabled bool   `json:"enabled"`
+		Status  string `json:"status"`
+	}
+	var out []indexerOut
 	for _, idx := range indexers {
-		icon := ui.Ok("●")
-		status := ui.Ok("OK")
+		st := "ok"
 		if !idx.Enable {
-			icon = ui.Dim("○")
-			status = ui.Dim("DISABLED")
+			st = "disabled"
 		} else if failedIDs[idx.ID] {
-			icon = ui.Err("●")
-			status = ui.Err("FAILING")
+			st = "failing"
 		}
-		flare := ""
-		for _, t := range idx.Tags {
-			if t == 1 {
-				flare = ui.Dim(" [flare]")
+		out = append(out, indexerOut{Name: idx.Name, Enabled: idx.Enable, Status: st})
+	}
+
+	ui.PrintOrJSON(out, func() {
+		ui.PrintBanner()
+		fmt.Println(ui.Bold("\n  Prowlarr — Indexers\n"))
+		for _, idx := range indexers {
+			icon := ui.Ok("●")
+			status := ui.Ok("OK")
+			if !idx.Enable {
+				icon = ui.Dim("○")
+				status = ui.Dim("DISABLED")
+			} else if failedIDs[idx.ID] {
+				icon = ui.Err("●")
+				status = ui.Err("FAILING")
 			}
-		}
-		cats := ""
-		if len(idx.Capabilities.Categories) > 0 {
-			var names []string
-			for _, c := range idx.Capabilities.Categories {
-				if len(names) < 3 {
-					names = append(names, c.Name)
+			flare := ""
+			for _, t := range idx.Tags {
+				if t == 1 {
+					flare = ui.Dim(" [flare]")
 				}
 			}
-			cats = ui.Dim(" " + strings.Join(names, ", "))
+			cats := ""
+			if len(idx.Capabilities.Categories) > 0 {
+				var names []string
+				for _, c := range idx.Capabilities.Categories {
+					if len(names) < 3 {
+						names = append(names, c.Name)
+					}
+				}
+				cats = ui.Dim(" " + strings.Join(names, ", "))
+			}
+			fmt.Printf("  %s %-20s %-8s%s%s\n", icon, idx.Name, status, flare, cats)
 		}
-		fmt.Printf("  %s %-20s %-8s%s%s\n", icon, idx.Name, status, flare, cats)
-	}
-	fmt.Printf("\n  %s\n", ui.Dim(fmt.Sprintf("%d indexers total", len(indexers))))
-	fmt.Printf("  %s\n\n", ui.Dim("Use 'admirarr indexers setup' to configure recommended indexers"))
+		fmt.Printf("\n  %s\n", ui.Dim(fmt.Sprintf("%d indexers total", len(indexers))))
+		fmt.Printf("  %s\n\n", ui.Dim("Use 'admirarr indexers setup' to configure recommended indexers"))
+	})
 }
 
 // ── Setup wizard ──
@@ -256,9 +217,11 @@ func runIndexersSetup(cmd *cobra.Command, args []string) {
 	ui.PrintBanner()
 	fmt.Println(ui.Bold("\n  Indexer Setup Wizard\n"))
 
+	client := arr.New("prowlarr")
+
 	// Check Prowlarr connectivity
-	var existing []prowlarrIndexer
-	if err := api.GetJSON("prowlarr", "api/v1/indexer", nil, &existing); err != nil {
+	existing, err := client.Indexers()
+	if err != nil {
 		fmt.Printf("  %s\n\n", ui.Err("Cannot reach Prowlarr"))
 		return
 	}
@@ -269,7 +232,7 @@ func runIndexersSetup(cmd *cobra.Command, args []string) {
 	}
 
 	// Check FlareSolverr
-	flareTag := getFlareTag()
+	flareTag := getFlareTag(client)
 	if flareTag > 0 {
 		fmt.Printf("  %s FlareSolverr detected (tag %d)\n\n", ui.Ok("●"), flareTag)
 	} else {
@@ -286,12 +249,11 @@ func runIndexersSetup(cmd *cobra.Command, args []string) {
 		"anime":   "Anime",
 	}
 
-	var toAdd []indexerDef
+	var toAdd []config.IndexerDef
 	for _, cat := range categories {
 		fmt.Printf("  %s\n", ui.Bold(categoryLabels[cat]))
 
 		var options []huh.Option[string]
-		var preselected []string
 
 		for _, def := range recommendedIndexers {
 			if def.Category != cat {
@@ -305,10 +267,6 @@ func runIndexersSetup(cmd *cobra.Command, args []string) {
 				label += " [needs FlareSolverr]"
 			}
 			options = append(options, huh.NewOption(label, def.Name))
-			// Pre-select if not already installed
-			if !existingNames[strings.ToLower(def.Name)] {
-				preselected = append(preselected, def.Name)
-			}
 		}
 
 		var selected []string
@@ -350,7 +308,7 @@ func runIndexersSetup(cmd *cobra.Command, args []string) {
 	}
 
 	var confirm bool
-	err := huh.NewConfirm().
+	err = huh.NewConfirm().
 		Title("Proceed?").
 		Value(&confirm).
 		Run()
@@ -361,7 +319,7 @@ func runIndexersSetup(cmd *cobra.Command, args []string) {
 
 	fmt.Println()
 	for _, def := range toAdd {
-		addProwlarrIndexer(def, flareTag)
+		addProwlarrIndexer(client, def, flareTag)
 	}
 	fmt.Println()
 }
@@ -375,18 +333,18 @@ func runIndexersAdd(cmd *cobra.Command, args []string) {
 
 	// Alias lookup
 	aliases := map[string]string{
-		"tpb":           "the pirate bay",
-		"piratebay":     "the pirate bay",
-		"tg":            "torrentgalaxy",
-		"nyaa":          "nyaa.si",
-		"tosho":         "tokyo toshokan",
-		"tokyotosho":    "tokyo toshokan",
+		"tpb":        "the pirate bay",
+		"piratebay":  "the pirate bay",
+		"tg":         "torrentgalaxy",
+		"nyaa":       "nyaa.si",
+		"tosho":      "tokyo toshokan",
+		"tokyotosho": "tokyo toshokan",
 	}
 	if alias, ok := aliases[query]; ok {
 		query = alias
 	}
 
-	var def *indexerDef
+	var def *config.IndexerDef
 	for i, d := range recommendedIndexers {
 		if strings.ToLower(d.Name) == query || strings.ToLower(d.DefinitionFile) == query {
 			def = &recommendedIndexers[i]
@@ -400,9 +358,11 @@ func runIndexersAdd(cmd *cobra.Command, args []string) {
 		return
 	}
 
+	client := arr.New("prowlarr")
+
 	// Check if already exists
-	var existing []prowlarrIndexer
-	if err := api.GetJSON("prowlarr", "api/v1/indexer", nil, &existing); err != nil {
+	existing, err := client.Indexers()
+	if err != nil {
 		fmt.Printf("\n  %s\n\n", ui.Err("Cannot reach Prowlarr"))
 		return
 	}
@@ -413,9 +373,9 @@ func runIndexersAdd(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	flareTag := getFlareTag()
+	flareTag := getFlareTag(client)
 	fmt.Println()
-	addProwlarrIndexer(*def, flareTag)
+	addProwlarrIndexer(client, *def, flareTag)
 	fmt.Println()
 }
 
@@ -424,15 +384,16 @@ func runIndexersAdd(cmd *cobra.Command, args []string) {
 func runIndexersRemove(cmd *cobra.Command, args []string) {
 	ui.PrintBanner()
 
-	query := strings.ToLower(args[0])
+	client := arr.New("prowlarr")
 
-	var indexers []prowlarrIndexer
-	if err := api.GetJSON("prowlarr", "api/v1/indexer", nil, &indexers); err != nil {
+	indexers, err := client.Indexers()
+	if err != nil {
 		fmt.Printf("\n  %s\n\n", ui.Err("Cannot reach Prowlarr"))
 		return
 	}
 
-	var target *prowlarrIndexer
+	query := strings.ToLower(args[0])
+	var target *arr.Indexer
 	for i, idx := range indexers {
 		if strings.EqualFold(idx.Name, query) || strings.EqualFold(idx.Name, args[0]) {
 			target = &indexers[i]
@@ -445,15 +406,7 @@ func runIndexersRemove(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	_, err := api.Get("prowlarr", fmt.Sprintf("api/v1/indexer/%d", target.ID), nil)
-	if err != nil {
-		fmt.Printf("\n  %s Failed to remove %s: %v\n\n", ui.Err("✗"), target.Name, err)
-		return
-	}
-
-	// Use DELETE
-	deleteURL := fmt.Sprintf("api/v1/indexer/%d", target.ID)
-	if _, err := api.Delete("prowlarr", deleteURL, nil); err != nil {
+	if err := client.DeleteIndexer(target.ID); err != nil {
 		fmt.Printf("\n  %s Failed to remove %s: %v\n\n", ui.Err("✗"), target.Name, err)
 		return
 	}
@@ -467,31 +420,16 @@ func runIndexersTest(cmd *cobra.Command, args []string) {
 	ui.PrintBanner()
 	fmt.Println(ui.Bold("\n  Testing Indexers\n"))
 
-	type testResult struct {
-		ID                 int  `json:"id"`
-		IsValid            bool `json:"isValid"`
-		ValidationFailures []struct {
-			ErrorMessage string `json:"errorMessage"`
-		} `json:"validationFailures"`
-	}
+	client := arr.New("prowlarr")
 
-	// Post returns body even on 400 (Prowlarr returns 400 when some tests fail)
-	// Use long timeout — testing all indexers can take 60s+
-	body, err := api.Post("prowlarr", "api/v1/indexer/testall", nil, nil, 120*time.Second)
+	results, err := client.TestAllIndexers()
 	if err != nil {
 		fmt.Printf("  %s\n\n", ui.Err("Cannot reach Prowlarr"))
 		return
 	}
 
-	var results []testResult
-	if json.Unmarshal(body, &results) != nil {
-		fmt.Printf("  %s\n\n", ui.Err("Unexpected response from Prowlarr"))
-		return
-	}
-
 	// Get indexer names
-	var indexers []prowlarrIndexer
-	_ = api.GetJSON("prowlarr", "api/v1/indexer", nil, &indexers)
+	indexers, _ := client.Indexers()
 	nameMap := make(map[int]string)
 	for _, idx := range indexers {
 		nameMap[idx.ID] = idx.Name
@@ -520,11 +458,9 @@ func runIndexersTest(cmd *cobra.Command, args []string) {
 
 // ── Helpers ──
 
-func getFlareTag() int {
-	var proxies []struct {
-		Tags []int `json:"tags"`
-	}
-	if api.GetJSON("prowlarr", "api/v1/indexerProxy", nil, &proxies) == nil {
+func getFlareTag(client *arr.Client) int {
+	proxies, err := client.IndexerProxies()
+	if err == nil {
 		for _, p := range proxies {
 			if len(p.Tags) > 0 {
 				return p.Tags[0]
@@ -534,7 +470,7 @@ func getFlareTag() int {
 	return 0
 }
 
-func addProwlarrIndexer(def indexerDef, flareTag int) {
+func addProwlarrIndexer(client *arr.Client, def config.IndexerDef, flareTag int) {
 	fields := []map[string]interface{}{}
 
 	// Definition file for Cardigann
@@ -581,15 +517,15 @@ func addProwlarrIndexer(def indexerDef, flareTag int) {
 		"fields":         fields,
 	}
 
-	body, err := api.Post("prowlarr", "api/v1/indexer", payload, nil)
+	created, err := client.AddIndexer(payload)
 	if err != nil {
 		fmt.Printf("  %s Failed to add %s: %v\n", ui.Err("✗"), def.Name, err)
 		return
 	}
 
-	var created prowlarrIndexer
-	if json.Unmarshal(body, &created) != nil {
-		// Check if it's a validation error array
+	if created.ID == 0 {
+		// Check if it's a validation error array — re-marshal and check
+		body, _ := json.Marshal(created)
 		var errs []struct {
 			ErrorMessage string `json:"errorMessage"`
 		}
@@ -608,7 +544,7 @@ func addProwlarrIndexer(def indexerDef, flareTag int) {
 	// Now enable it
 	payload["enable"] = true
 	payload["id"] = created.ID
-	_, err = api.Put("prowlarr", fmt.Sprintf("api/v1/indexer/%d", created.ID), payload, nil)
+	err = client.UpdateIndexer(created.ID, payload)
 	if err != nil {
 		// Enable failed (connectivity issue) — leave disabled
 		flareNote := ""
