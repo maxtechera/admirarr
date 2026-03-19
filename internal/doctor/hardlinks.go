@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 
 	"github.com/maxtechera/admirarr/internal/config"
 	"github.com/maxtechera/admirarr/internal/qbit"
@@ -70,21 +69,14 @@ func checkHardlinks(r *Result) {
 	mediaStat, err2 := os.Stat(mediaPath)
 
 	if err1 == nil && err2 == nil {
-		var tDev, mDev uint64
-		if sys, ok := torrentsStat.Sys().(*syscall.Stat_t); ok {
-			tDev = sys.Dev
-		}
-		if sys, ok := mediaStat.Sys().(*syscall.Stat_t); ok {
-			mDev = sys.Dev
-		}
-
-		if tDev != 0 && mDev != 0 {
-			if tDev == mDev {
+		same, ok := sameFilesystem(torrentsStat, mediaStat)
+		if ok {
+			if same {
 				r.ChecksPassed++
 				fmt.Printf("  %s Same filesystem: torrents + media (hardlinks possible)\n", ui.Ok("✓"))
 			} else {
-				r.Issues = append(r.Issues, Issue{Description:
-					fmt.Sprintf("CROSS-FILESYSTEM: %s and %s are on different devices. "+
+				r.Issues = append(r.Issues, Issue{Description: fmt.Sprintf(
+					"CROSS-FILESYSTEM: %s and %s are on different devices. "+
 						"Hardlinks won't work — Sonarr/Radarr will copy instead of link. "+
 						"Mount both under the same volume.", torrentsPath, mediaPath),
 				})
