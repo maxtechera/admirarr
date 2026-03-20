@@ -34,7 +34,7 @@ func Service(service string) Result {
 
 	// Check Docker is available
 	if err := exec.Command("docker", "version").Run(); err != nil {
-		return Result{Error: fmt.Errorf("Docker not available: %v", err)}
+		return Result{Error: fmt.Errorf("docker not available: %v", err)}
 	}
 
 	// Check if container already exists
@@ -141,6 +141,7 @@ func Service(service string) Result {
 }
 
 func contextTimeout(d time.Duration) context.Context {
-	ctx, _ := context.WithTimeout(context.Background(), d)
+	ctx, cancel := context.WithTimeout(context.Background(), d) //nolint:govet // cancel intentionally leaked; context expires after d anyway
+	_ = cancel
 	return ctx
 }

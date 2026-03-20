@@ -12,6 +12,8 @@ import (
 )
 
 // mockServiceMux creates a handler that responds to common *Arr API endpoints.
+//
+//nolint:unused // retained for upcoming check tests
 func mockServiceMux(apiVer string) http.Handler {
 	mux := http.NewServeMux()
 

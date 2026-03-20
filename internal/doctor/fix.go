@@ -328,12 +328,11 @@ func fixHostMismatch(desc string) bool {
 		if inService && strings.HasPrefix(trimmed, "host:") {
 			indent := line[:len(line)-len(strings.TrimLeft(line, " "))]
 			lines[i] = fmt.Sprintf(`%shost: %s`, indent, actualHost)
-			inService = false
 			break
 		}
 		// If we hit another service block, stop looking
 		if inService && !strings.HasPrefix(line, "    ") && trimmed != "" {
-			inService = false
+			break
 		}
 	}
 
