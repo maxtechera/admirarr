@@ -333,7 +333,7 @@ func fixHostMismatch(desc string) bool {
 		}
 		// If we hit another service block, stop looking
 		if inService && !strings.HasPrefix(line, "    ") && trimmed != "" {
-			inService = false
+			break
 		}
 	}
 
