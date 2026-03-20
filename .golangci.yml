@@ -3,7 +3,6 @@ version: "2"
 linters:
   default: standard
 
-issues:
   exclusions:
     rules:
       # Test files: unchecked errors are acceptable in test helpers/mocks
