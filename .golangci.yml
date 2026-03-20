@@ -1,37 +1,37 @@
 version: "2"
 
 linters:
-  enable-all: false
   default: standard
 
 issues:
-  exclude-rules:
-    # Test files: unchecked errors are acceptable in test helpers/mocks
-    - path: "_test\\.go"
-      linters:
-        - errcheck
+  exclusions:
+    rules:
+      # Test files: unchecked errors are acceptable in test helpers/mocks
+      - path: "_test\\.go"
+        linters:
+          - errcheck
 
-    # Defer close calls: Go idiom where errors are intentionally discarded
-    - linters:
-        - errcheck
-      text: "Error return value of `.*\\.Close` is not checked"
+      # Defer close calls: Go idiom where errors are intentionally discarded
+      - linters:
+          - errcheck
+        text: "Error return value of `.*\\.Close` is not checked"
 
-    # defer os.Remove / os.Rename in cleanup paths
-    - linters:
-        - errcheck
-      text: "Error return value of `os\\.(Remove|Rename)` is not checked"
+      # defer os.Remove / os.Rename in cleanup paths
+      - linters:
+          - errcheck
+        text: "Error return value of `os\\.(Remove|Rename)` is not checked"
 
-    # Fire-and-forget exec.Cmd.Run in setup/fix helpers
-    - linters:
-        - errcheck
-      text: "Error return value of `\\(\\*os/exec\\.Cmd\\)\\.Run` is not checked"
+      # Fire-and-forget exec.Cmd.Run in setup/fix helpers
+      - linters:
+          - errcheck
+        text: "Error return value of `\\(\\*os/exec\\.Cmd\\)\\.Run` is not checked"
 
-    # ui.SpinWhile — internal UI helper, error is logged internally
-    - linters:
-        - errcheck
-      text: "Error return value of `ui\\.SpinWhile` is not checked"
+      # ui.SpinWhile — internal UI helper, error is logged internally
+      - linters:
+          - errcheck
+        text: "Error return value of `ui\\.SpinWhile` is not checked"
 
-    # os.MkdirAll — idempotent, errors caught by downstream ops
-    - linters:
-        - errcheck
-      text: "Error return value of `os\\.MkdirAll` is not checked"
+      # os.MkdirAll — idempotent, errors caught by downstream ops
+      - linters:
+          - errcheck
+        text: "Error return value of `os\\.MkdirAll` is not checked"
