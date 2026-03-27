@@ -6,11 +6,15 @@
     <img alt="Admirarr" src="assets/logo.svg" width="180">
   </picture>
   <br><br>
+  <a href="https://github.com/maxtechera/admirarr/releases/tag/v0.1.0"><img src="https://img.shields.io/github/v/release/maxtechera/admirarr?style=for-the-badge&color=D4A843" alt="Release"></a>
+  &nbsp;
   <a href="#quick-start"><img src="https://img.shields.io/badge/install-one_liner-D4A843?style=for-the-badge" alt="Install"></a>
   &nbsp;
   <img src="https://img.shields.io/badge/go-single_binary-00ADD8?style=for-the-badge&logo=go&logoColor=white" alt="Go">
   &nbsp;
   <a href="https://agentskills.io"><img src="https://img.shields.io/badge/Agent_Skills-compatible-D4A843?style=for-the-badge" alt="Agent Skills"></a>
+  &nbsp;
+  <a href="https://github.com/maxtechera/admirarr/stargazers"><img src="https://img.shields.io/github/stars/maxtechera/admirarr?style=for-the-badge&color=yellow" alt="Stars"></a>
   &nbsp;
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge" alt="License"></a>
   <br><br>
