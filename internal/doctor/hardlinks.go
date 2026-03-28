@@ -1,3 +1,5 @@
+//go:build !windows
+
 package doctor
 
 import (
@@ -72,10 +74,10 @@ func checkHardlinks(r *Result) {
 	if err1 == nil && err2 == nil {
 		var tDev, mDev uint64
 		if sys, ok := torrentsStat.Sys().(*syscall.Stat_t); ok {
-			tDev = sys.Dev
+			tDev = uint64(sys.Dev) //nolint:unconvert // sys.Dev is int32 on linux/arm, uint64 on amd64
 		}
 		if sys, ok := mediaStat.Sys().(*syscall.Stat_t); ok {
-			mDev = sys.Dev
+			mDev = uint64(sys.Dev) //nolint:unconvert // sys.Dev is int32 on linux/arm, uint64 on amd64
 		}
 
 		if tDev != 0 && mDev != 0 {
