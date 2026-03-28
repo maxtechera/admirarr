@@ -1,9 +1,13 @@
 version: "2"
 
 linters:
-  # Start with no linters and only enable what we know works cleanly.
-  # Pre-existing lint debt across the codebase is tracked separately.
+  # Minimal: only enable linters with no pre-existing failures.
+  # Pre-existing lint debt (errcheck, govet, ineffassign, staticcheck,
+  # unused) tracked separately — not blocking CI gate.
   default: none
   enable:
-    - gofmt
     - misspell
+
+formatters:
+  enable:
+    - gofmt
