@@ -53,37 +53,10 @@ jobs:
           mkdir -p _site
           cp install.sh _site/install.sh
           cp install.ps1 _site/install.ps1
-
-          # 404.html = shell script (GitHub Pages serves 404.html for the root path,
-          # making `curl https://get.admirarr.dev | sh` work)
+          # 404.html = shell script (GitHub Pages serves 404.html for root path,
+          # making `curl https://get.admirarr.dev | sh` work natively)
           cp install.sh _site/404.html
-
-          cat > _site/index.html <<'HTMLEOF'
-          <!DOCTYPE html>
-          <html lang="en">
-          <head>
-            <meta charset="utf-8">
-            <title>⚓ Admirarr — Install</title>
-            <style>
-              body { font-family: monospace; max-width: 720px; margin: 80px auto; padding: 0 20px; background: #0d1117; color: #e6edf3; }
-              h1 { color: #d4a843; }
-              pre { background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 16px; }
-              code { color: #79c0ff; }
-              a { color: #58a6ff; }
-            </style>
-          </head>
-          <body>
-            <h1>⚓ Admirarr</h1>
-            <p>Command your <em>*Arr</em> fleet.</p>
-            <h2>Install</h2>
-            <pre><code>curl -fsSL https://get.admirarr.dev | sh</code></pre>
-            <h2>Windows</h2>
-            <pre><code>irm https://get.admirarr.dev/install.ps1 | iex</code></pre>
-            <p><a href="https://github.com/maxtechera/admirarr">GitHub →</a></p>
-          </body>
-          </html>
-          HTMLEOF
-
+          cp packaging/pages/index.html _site/index.html
           echo "get.admirarr.dev" > _site/CNAME
           touch _site/.nojekyll
 

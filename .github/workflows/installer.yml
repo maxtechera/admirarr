@@ -7,6 +7,7 @@ on:
       - install.sh
       - install.ps1
       - .github/workflows/installer.yml
+      - packaging/pages/**
   workflow_dispatch:
 
 permissions:
@@ -21,54 +22,13 @@ jobs:
       - name: Build installer site
         run: |
           mkdir -p _site
-
-          # install.sh at standard path
           cp install.sh _site/install.sh
           cp install.ps1 _site/install.ps1
-
-          # 404.html = the shell script itself (GitHub Pages serves 404.html for unknown paths,
-          # so `curl https://get.admirarr.dev | sh` → 404.html → valid shell).
-          # This is the standard GitHub Pages trick for installer endpoints.
+          # 404.html = shell script (GitHub Pages serves 404.html for root,
+          # making `curl https://get.admirarr.dev | sh` work natively)
           cp install.sh _site/404.html
-
-          # index.html for browser visitors
-          cat > _site/index.html <<'HTMLEOF'
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>⚓ Admirarr — Install</title>
-  <style>
-    body { font-family: monospace; max-width: 720px; margin: 80px auto; padding: 0 20px; background: #0d1117; color: #e6edf3; }
-    h1 { color: #d4a843; }
-    pre { background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 16px; overflow-x: auto; }
-    code { color: #79c0ff; }
-    a { color: #58a6ff; }
-  </style>
-</head>
-<body>
-  <h1>⚓ Admirarr</h1>
-  <p>Command your <em>*Arr</em> fleet — zero-dependency CLI for Plex + Radarr + Sonarr + Prowlarr.</p>
-
-  <h2>Install</h2>
-  <pre><code>curl -fsSL https://get.admirarr.dev | sh</code></pre>
-
-  <h2>Windows (PowerShell)</h2>
-  <pre><code>irm https://get.admirarr.dev/install.ps1 | iex</code></pre>
-
-  <p>
-    <a href="https://github.com/maxtechera/admirarr">GitHub →</a> &nbsp;
-    <a href="https://github.com/maxtechera/admirarr/releases">Releases →</a>
-  </p>
-</body>
-</html>
-HTMLEOF
-
-          # CNAME for custom domain
+          cp packaging/pages/index.html _site/index.html
           echo "get.admirarr.dev" > _site/CNAME
-
-          # Disable Jekyll processing
           touch _site/.nojekyll
 
       - name: Deploy to GitHub Pages
