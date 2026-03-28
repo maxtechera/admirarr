@@ -50,7 +50,7 @@ func TestCheckConnectivity_WithMockServer(t *testing.T) {
 	// Create a mock server for radarr
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
-		w.Write([]byte(`[]`))
+		_, _ = w.Write([]byte(`[]`))
 	}))
 	defer ts.Close()
 
@@ -87,13 +87,13 @@ func TestCheckMediaPaths_WithMockServer(t *testing.T) {
 	radarrMux := http.NewServeMux()
 	radarrMux.HandleFunc("/api/v3/rootfolder", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]map[string]interface{}{
+		_ = json.NewEncoder(w).Encode([]map[string]interface{}{
 			{"id": 1, "path": "/data/media/movies", "accessible": true, "freeSpace": 500000000000},
 		})
 	})
 	radarrMux.HandleFunc("/api/v3/downloadclient", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]map[string]interface{}{
+		_ = json.NewEncoder(w).Encode([]map[string]interface{}{
 			{"id": 1, "name": "qBittorrent", "enable": true, "implementation": "QBittorrent",
 				"fields": []map[string]interface{}{
 					{"name": "host", "value": "localhost"},
@@ -105,7 +105,7 @@ func TestCheckMediaPaths_WithMockServer(t *testing.T) {
 	// Health endpoint for reachability check
 	radarrMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
-		w.Write([]byte(`[]`))
+		_, _ = w.Write([]byte(`[]`))
 	})
 	radarrTS := httptest.NewServer(radarrMux)
 	defer radarrTS.Close()
@@ -113,13 +113,13 @@ func TestCheckMediaPaths_WithMockServer(t *testing.T) {
 	sonarrMux := http.NewServeMux()
 	sonarrMux.HandleFunc("/api/v3/rootfolder", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]map[string]interface{}{
+		_ = json.NewEncoder(w).Encode([]map[string]interface{}{
 			{"id": 1, "path": "/data/media/tv", "accessible": true, "freeSpace": 500000000000},
 		})
 	})
 	sonarrMux.HandleFunc("/api/v3/downloadclient", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]map[string]interface{}{
+		_ = json.NewEncoder(w).Encode([]map[string]interface{}{
 			{"id": 1, "name": "qBittorrent", "enable": true, "implementation": "QBittorrent",
 				"fields": []map[string]interface{}{
 					{"name": "host", "value": "localhost"},
@@ -130,7 +130,7 @@ func TestCheckMediaPaths_WithMockServer(t *testing.T) {
 	})
 	sonarrMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
-		w.Write([]byte(`[]`))
+		_, _ = w.Write([]byte(`[]`))
 	})
 	sonarrTS := httptest.NewServer(sonarrMux)
 	defer sonarrTS.Close()
@@ -155,7 +155,7 @@ func TestCheckServiceWarnings_NoWarnings(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`[]`))
+		_, _ = w.Write([]byte(`[]`))
 	})
 
 	ts := httptest.NewServer(mux)
@@ -180,7 +180,7 @@ func TestCheckServiceWarnings_WithWarnings(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]map[string]string{
+		_ = json.NewEncoder(w).Encode([]map[string]string{
 			{"type": "warning", "message": "Root folder is not accessible", "source": "RootFolderCheck"},
 		})
 	})
@@ -207,7 +207,7 @@ func TestCheckIndexers_WithMockProwlarr(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v1/indexer", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]map[string]interface{}{
+		_ = json.NewEncoder(w).Encode([]map[string]interface{}{
 			{"id": 1, "name": "1337x", "enable": true},
 			{"id": 2, "name": "TorrentGalaxy", "enable": true},
 			{"id": 3, "name": "Disabled Indexer", "enable": false},
@@ -215,7 +215,7 @@ func TestCheckIndexers_WithMockProwlarr(t *testing.T) {
 	})
 	mux.HandleFunc("/api/v1/indexerstatus", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]map[string]interface{}{
+		_ = json.NewEncoder(w).Encode([]map[string]interface{}{
 			{"indexerId": 2, "mostRecentFailure": "2026-03-10T12:00:00Z"},
 		})
 	})

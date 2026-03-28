@@ -207,7 +207,7 @@ func checkQbitCategories(state *SetupState, r *StepResult) {
 			return
 		}
 		body, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		_ = resp.Body.Close()
 
 		var categories map[string]struct {
 			SavePath string `json:"savePath"`
@@ -252,7 +252,7 @@ func checkQbitCategories(state *SetupState, r *StepResult) {
 			r.errf("failed to fix qBittorrent category %s via API: %v", catName, err)
 			continue
 		}
-		resp2.Body.Close()
+		_ = resp2.Body.Close()
 
 		fmt.Printf("  %s %s → %s (fixed)\n", ui.Ok("✓"), catName, expectedPath)
 		r.fix()
@@ -269,7 +269,7 @@ func checkQbitDefaultPath(state *SetupState, r *StepResult) {
 		r.errf("cannot query qBittorrent preferences: %v", err)
 		return
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 	body, _ := io.ReadAll(resp.Body)
 
 	var prefs struct {
@@ -307,7 +307,7 @@ func checkQbitDefaultPath(state *SetupState, r *StepResult) {
 		r.errf("failed to fix qBittorrent save path: %v", err)
 		return
 	}
-	resp2.Body.Close()
+	_ = resp2.Body.Close()
 
 	fmt.Printf("  %s Default save path fixed to %s\n", ui.Ok("✓"), expectedPath)
 	r.fix()

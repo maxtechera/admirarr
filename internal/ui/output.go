@@ -15,7 +15,7 @@ func IsJSON() bool {
 
 // PrintJSON encodes data as JSON to stdout.
 func PrintJSON(data any) {
-	json.NewEncoder(os.Stdout).Encode(data)
+	_ = json.NewEncoder(os.Stdout).Encode(data)
 }
 
 // PrintOrJSON prints JSON if --output json, otherwise calls the text function.

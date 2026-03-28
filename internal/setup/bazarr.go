@@ -248,7 +248,7 @@ func writeBazarrConfigSed(container, configPath, service, ip, port, apikey strin
 	// Copy config file out of the container
 	tmpFile := fmt.Sprintf("/tmp/bazarr_config_%d.yaml", time.Now().UnixNano())
 	defer func() {
-		exec.Command("rm", "-f", tmpFile).Run()
+		_ = exec.Command("rm", "-f", tmpFile).Run()
 	}()
 
 	cpOut := exec.Command("docker", "cp", container+":"+configPath, tmpFile)
@@ -284,7 +284,7 @@ func writeBazarrConfigSed(container, configPath, service, ip, port, apikey strin
 func enableBazarrServices(container, configPath string, services []string) error {
 	tmpFile := fmt.Sprintf("/tmp/bazarr_enable_%d.yaml", time.Now().UnixNano())
 	defer func() {
-		exec.Command("rm", "-f", tmpFile).Run()
+		_ = exec.Command("rm", "-f", tmpFile).Run()
 	}()
 
 	cpOut := exec.Command("docker", "cp", container+":"+configPath, tmpFile)

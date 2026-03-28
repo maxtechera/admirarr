@@ -209,7 +209,7 @@ func initSeerr(state *SetupState, svc *ServiceState, r *StepResult) {
 		return
 	}
 	pubBody, _ := io.ReadAll(pubResp.Body)
-	pubResp.Body.Close()
+	_ = pubResp.Body.Close()
 
 	var pubSettings struct {
 		Initialized bool `json:"initialized"`
@@ -229,7 +229,7 @@ func initSeerr(state *SetupState, svc *ServiceState, r *StepResult) {
 	jellyHost := parsed.Hostname()
 	jellyPort := 8096
 	if parsed.Port() != "" {
-		fmt.Sscanf(parsed.Port(), "%d", &jellyPort)
+		_, _ = fmt.Sscanf(parsed.Port(), "%d", &jellyPort)
 	}
 
 	if state.wouldFix(r, "Seerr → Initialize via Jellyfin auth") {
@@ -254,7 +254,7 @@ func initSeerr(state *SetupState, svc *ServiceState, r *StepResult) {
 		return
 	}
 	io.ReadAll(authResp.Body)
-	authResp.Body.Close()
+	_ = authResp.Body.Close()
 
 	if authResp.StatusCode != 200 {
 		fmt.Printf("  %s Seerr Jellyfin auth returned %d\n", ui.Err("✗"), authResp.StatusCode)
@@ -269,7 +269,7 @@ func initSeerr(state *SetupState, svc *ServiceState, r *StepResult) {
 		fmt.Printf("  %s Seerr initialization failed: %v\n", ui.Err("✗"), err)
 		return
 	}
-	initResp.Body.Close()
+	_ = initResp.Body.Close()
 
 	// Step 3: Get API key from main settings
 	settingsResp, err := cc.Get(base + "/api/v1/settings/main")
@@ -278,7 +278,7 @@ func initSeerr(state *SetupState, svc *ServiceState, r *StepResult) {
 		return
 	}
 	settingsBody, _ := io.ReadAll(settingsResp.Body)
-	settingsResp.Body.Close()
+	_ = settingsResp.Body.Close()
 
 	var mainSettings struct {
 		APIKey string `json:"apiKey"`

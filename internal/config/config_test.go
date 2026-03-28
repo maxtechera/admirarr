@@ -46,7 +46,7 @@ services:
 keys:
   radarr: "test-radarr-key"
 `
-	os.WriteFile(configFile, []byte(content), 0644)
+	_ = os.WriteFile(configFile, []byte(content), 0644)
 
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
@@ -78,7 +78,7 @@ services:
     host: localhost
     port: 5055
 `
-	os.WriteFile(filepath.Join(dir, "config.yaml"), []byte(content), 0644)
+	_ = os.WriteFile(filepath.Join(dir, "config.yaml"), []byte(content), 0644)
 
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
@@ -108,7 +108,7 @@ func TestLoad_IsConfigured(t *testing.T) {
   radarr:
     port: 7878
 `
-	os.WriteFile(filepath.Join(dir, "config.yaml"), []byte(content), 0644)
+	_ = os.WriteFile(filepath.Join(dir, "config.yaml"), []byte(content), 0644)
 
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")

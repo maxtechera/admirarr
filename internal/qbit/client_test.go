@@ -18,7 +18,7 @@ func setupQbit(t *testing.T, handler http.Handler) (*httptest.Server, *Client) {
 	addr := strings.TrimPrefix(ts.URL, "http://")
 	parts := strings.SplitN(addr, ":", 2)
 	var port int
-	fmt.Sscanf(parts[1], "%d", &port)
+	_, _ = fmt.Sscanf(parts[1], "%d", &port)
 	viper.Set("services.qbittorrent.host", parts[0])
 	viper.Set("services.qbittorrent.port", port)
 	config.Load()
@@ -28,7 +28,7 @@ func setupQbit(t *testing.T, handler http.Handler) (*httptest.Server, *Client) {
 func TestTorrents(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v2/torrents/info", func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode([]Torrent{
+		_ = json.NewEncoder(w).Encode([]Torrent{
 			{Hash: "abc123", Name: "Inception.2010.1080p", Size: 5_000_000_000, Progress: 0.75, DLSpeed: 10_000_000, State: "downloading", ETA: 300, Category: "movies"},
 			{Hash: "def456", Name: "The.Matrix.1999", Size: 3_000_000_000, Progress: 1.0, DLSpeed: 0, State: "uploading", Category: "movies"},
 		})
@@ -58,7 +58,7 @@ func TestTorrents(t *testing.T) {
 func TestTorrents_Empty(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v2/torrents/info", func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode([]Torrent{})
+		_ = json.NewEncoder(w).Encode([]Torrent{})
 	})
 
 	ts, client := setupQbit(t, mux)
@@ -76,7 +76,7 @@ func TestTorrents_Empty(t *testing.T) {
 func TestPreferences(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v2/app/preferences", func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(Preferences{
+		_ = json.NewEncoder(w).Encode(Preferences{
 			SavePath:     "/data/torrents",
 			WebUIPort:    8080,
 			ListenPort:   6881,
@@ -104,7 +104,7 @@ func TestPreferences(t *testing.T) {
 func TestVersion(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v2/app/version", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("v4.6.3\n"))
+		_, _ = w.Write([]byte("v4.6.3\n"))
 	})
 
 	ts, client := setupQbit(t, mux)
@@ -122,7 +122,7 @@ func TestVersion(t *testing.T) {
 func TestCategories(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v2/torrents/categories", func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]Category{
+		_ = json.NewEncoder(w).Encode(map[string]Category{
 			"movies":    {Name: "movies", SavePath: "/data/torrents/movies"},
 			"tv-sonarr": {Name: "tv-sonarr", SavePath: "/data/torrents/tv"},
 		})
@@ -149,7 +149,7 @@ func TestPause(t *testing.T) {
 		if r.Method != "POST" {
 			t.Errorf("expected POST, got %s", r.Method)
 		}
-		r.ParseForm()
+		_ = r.ParseForm()
 		if r.FormValue("hashes") != "abc123|def456" {
 			t.Errorf("expected hashes=abc123|def456, got %s", r.FormValue("hashes"))
 		}
@@ -170,7 +170,7 @@ func TestResume(t *testing.T) {
 		if r.Method != "POST" {
 			t.Errorf("expected POST, got %s", r.Method)
 		}
-		r.ParseForm()
+		_ = r.ParseForm()
 		if r.FormValue("hashes") != "all" {
 			t.Errorf("expected hashes=all, got %s", r.FormValue("hashes"))
 		}
@@ -191,7 +191,7 @@ func TestDelete(t *testing.T) {
 		if r.Method != "POST" {
 			t.Errorf("expected POST, got %s", r.Method)
 		}
-		r.ParseForm()
+		_ = r.ParseForm()
 		if r.FormValue("hashes") != "abc123" {
 			t.Errorf("expected hashes=abc123, got %s", r.FormValue("hashes"))
 		}
@@ -212,7 +212,7 @@ func TestDelete(t *testing.T) {
 func TestDelete_NoFiles(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v2/torrents/delete", func(w http.ResponseWriter, r *http.Request) {
-		r.ParseForm()
+		_ = r.ParseForm()
 		if r.FormValue("deleteFiles") != "false" {
 			t.Errorf("expected deleteFiles=false, got %s", r.FormValue("deleteFiles"))
 		}
@@ -233,18 +233,18 @@ func TestQbitFullWorkflow(t *testing.T) {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/api/v2/torrents/info", func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode([]Torrent{
+		_ = json.NewEncoder(w).Encode([]Torrent{
 			{Hash: "abc", Name: "Movie.torrent", Progress: 0.5, State: "downloading"},
 		})
 	})
 	mux.HandleFunc("/api/v2/app/version", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("v4.6.3"))
+		_, _ = w.Write([]byte("v4.6.3"))
 	})
 	mux.HandleFunc("/api/v2/app/preferences", func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(Preferences{SavePath: "/data/torrents"})
+		_ = json.NewEncoder(w).Encode(Preferences{SavePath: "/data/torrents"})
 	})
 	mux.HandleFunc("/api/v2/torrents/categories", func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]Category{
+		_ = json.NewEncoder(w).Encode(map[string]Category{
 			"movies": {Name: "movies", SavePath: "/data/torrents/movies"},
 		})
 	})

@@ -18,14 +18,14 @@ func TestGet_Success(t *testing.T) {
 		if r.Method != "GET" {
 			t.Errorf("expected GET, got %s", r.Method)
 		}
-		w.Write([]byte(`{"status":"ok"}`))
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	}))
 	defer ts.Close()
 
 	addr := strings.TrimPrefix(ts.URL, "http://")
 	parts := strings.SplitN(addr, ":", 2)
 	var port int
-	fmt.Sscanf(parts[1], "%d", &port)
+	_, _ = fmt.Sscanf(parts[1], "%d", &port)
 
 	viper.Set("services.testget.host", parts[0])
 	viper.Set("services.testget.port", port)
@@ -43,14 +43,14 @@ func TestGet_Success(t *testing.T) {
 func TestGetJSON_Unmarshal(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"name": "radarr", "version": "5.0"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"name": "radarr", "version": "5.0"})
 	}))
 	defer ts.Close()
 
 	addr := strings.TrimPrefix(ts.URL, "http://")
 	parts := strings.SplitN(addr, ":", 2)
 	var port int
-	fmt.Sscanf(parts[1], "%d", &port)
+	_, _ = fmt.Sscanf(parts[1], "%d", &port)
 	viper.Set("services.testjson.host", parts[0])
 	viper.Set("services.testjson.port", port)
 	config.Load()
@@ -80,18 +80,18 @@ func TestPost_SendsJSON(t *testing.T) {
 		}
 		body, _ := io.ReadAll(r.Body)
 		var payload map[string]string
-		json.Unmarshal(body, &payload)
+		_ = json.Unmarshal(body, &payload)
 		if payload["path"] != "/movies" {
 			t.Errorf("expected path=/movies, got %s", payload["path"])
 		}
-		w.Write([]byte(`{"id":1}`))
+		_, _ = w.Write([]byte(`{"id":1}`))
 	}))
 	defer ts.Close()
 
 	addr := strings.TrimPrefix(ts.URL, "http://")
 	parts := strings.SplitN(addr, ":", 2)
 	var port int
-	fmt.Sscanf(parts[1], "%d", &port)
+	_, _ = fmt.Sscanf(parts[1], "%d", &port)
 	viper.Set("services.testpost.host", parts[0])
 	viper.Set("services.testpost.port", port)
 	config.Load()
@@ -114,14 +114,14 @@ func TestPut_SendsJSON(t *testing.T) {
 			t.Errorf("expected application/json, got %s", ct)
 		}
 		body, _ := io.ReadAll(r.Body)
-		w.Write(body) // Echo back
+		_, _ = w.Write(body) // Echo back
 	}))
 	defer ts.Close()
 
 	addr := strings.TrimPrefix(ts.URL, "http://")
 	parts := strings.SplitN(addr, ":", 2)
 	var port int
-	fmt.Sscanf(parts[1], "%d", &port)
+	_, _ = fmt.Sscanf(parts[1], "%d", &port)
 	viper.Set("services.testput.host", parts[0])
 	viper.Set("services.testput.port", port)
 	config.Load()
@@ -132,7 +132,7 @@ func TestPut_SendsJSON(t *testing.T) {
 		t.Fatalf("Put failed: %v", err)
 	}
 	var result map[string]interface{}
-	json.Unmarshal(data, &result)
+	_ = json.Unmarshal(data, &result)
 	if result["host"] != "localhost" {
 		t.Errorf("expected host=localhost, got %v", result["host"])
 	}
@@ -141,14 +141,14 @@ func TestPut_SendsJSON(t *testing.T) {
 func TestPostJSON_Unmarshal(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"id":42,"name":"test"}`))
+		_, _ = w.Write([]byte(`{"id":42,"name":"test"}`))
 	}))
 	defer ts.Close()
 
 	addr := strings.TrimPrefix(ts.URL, "http://")
 	parts := strings.SplitN(addr, ":", 2)
 	var port int
-	fmt.Sscanf(parts[1], "%d", &port)
+	_, _ = fmt.Sscanf(parts[1], "%d", &port)
 	viper.Set("services.testpostjson.host", parts[0])
 	viper.Set("services.testpostjson.port", port)
 	config.Load()
@@ -169,14 +169,14 @@ func TestPostJSON_Unmarshal(t *testing.T) {
 func TestPutJSON_Unmarshal(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"id":1,"updated":true}`))
+		_, _ = w.Write([]byte(`{"id":1,"updated":true}`))
 	}))
 	defer ts.Close()
 
 	addr := strings.TrimPrefix(ts.URL, "http://")
 	parts := strings.SplitN(addr, ":", 2)
 	var port int
-	fmt.Sscanf(parts[1], "%d", &port)
+	_, _ = fmt.Sscanf(parts[1], "%d", &port)
 	viper.Set("services.testputjson.host", parts[0])
 	viper.Set("services.testputjson.port", port)
 	config.Load()
@@ -203,7 +203,7 @@ func TestCheckReachable_Up(t *testing.T) {
 	addr := strings.TrimPrefix(ts.URL, "http://")
 	parts := strings.SplitN(addr, ":", 2)
 	var port int
-	fmt.Sscanf(parts[1], "%d", &port)
+	_, _ = fmt.Sscanf(parts[1], "%d", &port)
 	viper.Set("services.qbittorrent.host", parts[0])
 	viper.Set("services.qbittorrent.port", port)
 	config.Load()
@@ -229,14 +229,14 @@ func TestGet_WithParams(t *testing.T) {
 		if r.URL.Query().Get("pageSize") != "10" {
 			t.Errorf("expected pageSize=10, got %s", r.URL.Query().Get("pageSize"))
 		}
-		w.Write([]byte(`{"ok":true}`))
+		_, _ = w.Write([]byte(`{"ok":true}`))
 	}))
 	defer ts.Close()
 
 	addr := strings.TrimPrefix(ts.URL, "http://")
 	parts := strings.SplitN(addr, ":", 2)
 	var port int
-	fmt.Sscanf(parts[1], "%d", &port)
+	_, _ = fmt.Sscanf(parts[1], "%d", &port)
 	viper.Set("services.testparams.host", parts[0])
 	viper.Set("services.testparams.port", port)
 	config.Load()

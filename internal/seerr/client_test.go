@@ -18,7 +18,7 @@ func setupSeerr(t *testing.T, handler http.Handler) (*httptest.Server, *Client) 
 	addr := strings.TrimPrefix(ts.URL, "http://")
 	parts := strings.SplitN(addr, ":", 2)
 	var port int
-	fmt.Sscanf(parts[1], "%d", &port)
+	_, _ = fmt.Sscanf(parts[1], "%d", &port)
 	viper.Set("services.seerr.host", parts[0])
 	viper.Set("services.seerr.port", port)
 	config.Load()
@@ -34,7 +34,7 @@ func TestRequests(t *testing.T) {
 		if r.URL.Query().Get("sort") != "added" {
 			t.Errorf("expected sort=added, got %s", r.URL.Query().Get("sort"))
 		}
-		json.NewEncoder(w).Encode(RequestPage{
+		_ = json.NewEncoder(w).Encode(RequestPage{
 			PageInfo: struct {
 				Results int `json:"results"`
 			}{Results: 2},
@@ -95,7 +95,7 @@ func TestRequests(t *testing.T) {
 func TestRequests_Empty(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v1/request", func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(RequestPage{
+		_ = json.NewEncoder(w).Encode(RequestPage{
 			PageInfo: struct {
 				Results int `json:"results"`
 			}{Results: 0},
@@ -118,7 +118,7 @@ func TestRequests_Empty(t *testing.T) {
 func TestResolveTitle_Movie(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v1/movie/27205", func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"title":       "Inception",
 			"releaseDate": "2010-07-16",
 		})
@@ -139,7 +139,7 @@ func TestResolveTitle_Movie(t *testing.T) {
 func TestResolveTitle_TV(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v1/tv/1396", func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"name":         "Breaking Bad",
 			"firstAirDate": "2008-01-20",
 		})
@@ -176,7 +176,7 @@ func TestResolveTitle_Fallback(t *testing.T) {
 func TestResolveTitle_MissingFields(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v1/movie/12345", func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"id": 12345,
 			// no title, no releaseDate
 		})
@@ -200,7 +200,7 @@ func TestSeerrFullWorkflow(t *testing.T) {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/api/v1/request", func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(RequestPage{
+		_ = json.NewEncoder(w).Encode(RequestPage{
 			PageInfo: struct {
 				Results int `json:"results"`
 			}{Results: 1},
@@ -219,7 +219,7 @@ func TestSeerrFullWorkflow(t *testing.T) {
 	})
 
 	mux.HandleFunc("/api/v1/movie/27205", func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"title":       "Inception",
 			"releaseDate": "2010-07-16",
 		})

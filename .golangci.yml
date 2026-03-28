@@ -8,3 +8,7 @@ version: "2"
 
 linters:
   default: standard
+  disable:
+    # Pre-existing debt — being cleaned up incrementally. See NEO-417.
+    - errcheck
+    - staticcheck

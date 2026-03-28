@@ -34,7 +34,7 @@ func checkNativeReachable(name, remoteHost string, port int) bool {
 	if err != nil {
 		return false
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	return resp.StatusCode == 200
 }
 

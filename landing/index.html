@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admirarr — Command your *Arr fleet from one terminal</title>
+  <meta name="description" content="Deploy, wire, operate, and diagnose your Jellyfin/Plex + *Arr stack from one terminal. One binary, 26 commands, JSON output everywhere. Human and agent operated.">
+  <meta name="keywords" content="admirarr, arr stack, jellyfin, plex, radarr, sonarr, prowlarr, media server, cli, ai agent, self-hosted">
+
+  <!-- OG / Twitter -->
+  <meta property="og:title" content="Admirarr — Command your *Arr fleet from one terminal">
+  <meta property="og:description" content="One binary. 26 commands. JSON output everywhere. Deploy, wire, operate, and diagnose your Jellyfin/Plex + *Arr stack. Human and agent operated.">
+  <meta property="og:image" content="https://admirarr.dev/og.png">
+  <meta property="og:url" content="https://admirarr.dev">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Admirarr — Command your *Arr fleet">
+  <meta name="twitter:description" content="One binary. 26 commands. Deploy, wire, operate, and diagnose your *Arr stack from the terminal.">
+  <meta name="twitter:image" content="https://admirarr.dev/og.png">
+
+  <!-- Favicon -->
+    <link rel="preload" href="logo-dark.svg" as="image" type="image/svg+xml">
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
+
+  <style>
+    :root {
+      --gold: #D4A843;
+      --gold-light: #F0D080;
+      --navy: #0A1628;
+      --navy-mid: #0F2040;
+      --navy-light: #162848;
+      --navy-card: #1a2f50;
+      --text: #e8edf5;
+      --text-muted: #8fa3c0;
+      --green: #4ade80;
+      --red: #f87171;
+      --cyan: #67e8f9;
+      --mono: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+      --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html {
+      scroll-behavior: smooth;
+      font-size: 16px;
+    }
+
+    body {
+      background: var(--navy);
+      color: var(--text);
+      font-family: var(--sans);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.75rem 1.5rem;
+      background: rgba(10, 22, 40, 0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(212, 168, 67, 0.15);
+    }
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      text-decoration: none;
+      color: var(--text);
+      font-weight: 700;
+      font-size: 1.1rem;
+      letter-spacing: -0.02em;
+    }
+
+    .nav-logo img { width: 28px; height: 28px; }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+    }
+
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.875rem;
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover { color: var(--gold); }
+
+    .nav-cta {
+      background: var(--gold);
+      color: var(--navy) !important;
+      padding: 0.4rem 1rem;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.875rem !important;
+      transition: background 0.2s !important;
+    }
+
+    .nav-cta:hover { background: var(--gold-light) !important; color: var(--navy) !important; }
+
+    /* ── HERO ── */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 6rem 1.5rem 4rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse 80% 60% at 50% 30%, rgba(212,168,67,0.08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: rgba(212,168,67,0.12);
+      border: 1px solid rgba(212,168,67,0.3);
+      color: var(--gold);
+      padding: 0.3rem 0.85rem;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: 1.5rem;
+    }
+
+    .hero-logo {
+      width: 100px;
+      height: 100px;
+      margin-bottom: 1.5rem;
+      filter: drop-shadow(0 0 24px rgba(212,168,67,0.3));
+    }
+
+    .hero h1 {
+      font-size: clamp(2.2rem, 5vw, 3.8rem);
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: -0.03em;
+      margin-bottom: 1rem;
+      max-width: 800px;
+    }
+
+    .hero h1 .accent { color: var(--gold); }
+
+    .hero-sub {
+      font-size: clamp(1rem, 2vw, 1.25rem);
+      color: var(--text-muted);
+      max-width: 600px;
+      margin-bottom: 2.5rem;
+      line-height: 1.7;
+    }
+
+    .hero-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      justify-content: center;
+      margin-bottom: 2.5rem;
+    }
+
+    .pill {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      color: var(--text-muted);
+      padding: 0.3rem 0.75rem;
+      border-radius: 999px;
+      font-size: 0.8rem;
+    }
+
+    /* ── INSTALL BOX ── */
+    .install-box {
+      background: rgba(15,32,64,0.8);
+      border: 1px solid rgba(212,168,67,0.25);
+      border-radius: 12px;
+      padding: 1.25rem 1.75rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      max-width: 520px;
+      width: 100%;
+      margin-bottom: 1rem;
+      position: relative;
+    }
+
+    .install-prompt {
+      color: var(--gold);
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      user-select: none;
+    }
+
+    .install-cmd {
+      font-family: var(--mono);
+      font-size: 0.95rem;
+      color: var(--text);
+      flex: 1;
+      word-break: break-all;
+    }
+
+    .copy-btn {
+      background: none;
+      border: 1px solid rgba(255,255,255,0.15);
+      color: var(--text-muted);
+      padding: 0.3rem 0.6rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.75rem;
+      transition: all 0.2s;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .copy-btn:hover { border-color: var(--gold); color: var(--gold); }
+    .copy-btn.copied { border-color: var(--green); color: var(--green); }
+
+    .install-note {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-bottom: 2rem;
+    }
+
+    .install-note a { color: var(--gold); text-decoration: underline; text-underline-offset: 3px; }
+    a:focus { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+    .hero-btns {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: var(--gold);
+      color: var(--navy);
+      padding: 0.7rem 1.5rem;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      text-decoration: none;
+      transition: background 0.2s, transform 0.1s;
+    }
+
+    .btn-primary:hover { background: var(--gold-light); transform: translateY(-1px); }
+
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.15);
+      color: var(--text);
+      padding: 0.7rem 1.5rem;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+
+    .btn-secondary:hover { border-color: var(--gold); color: var(--gold); transform: translateY(-1px); }
+
+    /* ── TERMINAL DEMO ── */
+    .demo-section {
+      padding: 5rem 1.5rem;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .section-label {
+      text-align: center;
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 0.75rem;
+    }
+
+    .section-title {
+      text-align: center;
+      font-size: clamp(1.8rem, 4vw, 2.5rem);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.75rem;
+    }
+
+    .section-sub {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 1rem;
+      margin-bottom: 2.5rem;
+      max-width: 520px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .terminal {
+      background: #0d1117;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+
+    .terminal-bar {
+      background: #161b22;
+      padding: 0.75rem 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .dot { width: 12px; height: 12px; border-radius: 50%; }
+    .dot-r { background: #ff5f56; }
+    .dot-y { background: #ffbd2e; }
+    .dot-g { background: #27c93f; }
+
+    .terminal-title {
+      flex: 1;
+      text-align: center;
+      font-size: 0.75rem;
+      color: #6e7681;
+      font-family: var(--mono);
+    }
+
+    .terminal-body {
+      padding: 1.25rem 1.5rem;
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      line-height: 1.7;
+      overflow-x: auto;
+    }
+
+    .t-prompt { color: var(--gold); }
+    .t-cmd { color: var(--text); }
+    .t-out { color: #8b949e; }
+    .t-header { color: var(--cyan); font-weight: bold; }
+    .t-border { color: #30363d; }
+    .t-ok { color: var(--green); }
+    .t-err { color: var(--red); }
+    .t-val { color: var(--text); }
+    .t-key { color: #79c0ff; }
+    .t-dim { color: #484f58; }
+    .t-gold { color: var(--gold); }
+
+    /* ── TABS ── */
+    .tabs {
+      display: flex;
+      gap: 0.25rem;
+      margin-bottom: 1.25rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .tab-btn {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.1);
+      color: var(--text-muted);
+      padding: 0.4rem 0.9rem;
+      border-radius: 6px;
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .tab-btn:hover { border-color: var(--gold); color: var(--gold); }
+
+    .tab-btn.active {
+      background: rgba(212,168,67,0.15);
+      border-color: var(--gold);
+      color: var(--gold);
+    }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* ── FEATURES GRID ── */
+    .features-section {
+      padding: 5rem 1.5rem;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.25rem;
+      margin-top: 2.5rem;
+    }
+
+    .feature-card {
+      background: var(--navy-card);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      padding: 1.5rem;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+
+    .feature-card:hover {
+      border-color: rgba(212,168,67,0.3);
+      transform: translateY(-2px);
+    }
+
+    .feature-icon {
+      font-size: 2rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .feature-card h3 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      color: var(--text);
+    }
+
+    .feature-card p {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    .feature-tag {
+      display: inline-block;
+      background: rgba(212,168,67,0.1);
+      color: var(--gold);
+      border: 1px solid rgba(212,168,67,0.2);
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-family: var(--mono);
+      margin-top: 0.75rem;
+    }
+
+    /* ── AGENT SECTION ── */
+    .agent-section {
+      padding: 5rem 1.5rem;
+      background: rgba(15,32,64,0.4);
+      border-top: 1px solid rgba(255,255,255,0.06);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .agent-inner {
+      max-width: 1000px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3rem;
+      align-items: center;
+    }
+
+    .agent-platforms {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+      margin-top: 1.5rem;
+    }
+
+    .platform-chip {
+      background: var(--navy-card);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px;
+      padding: 0.6rem 0.9rem;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .platform-chip .dot-ok {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      flex-shrink: 0;
+    }
+
+    /* ── INSTALL METHODS ── */
+    .install-section {
+      padding: 5rem 1.5rem;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .install-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+      margin-top: 2rem;
+    }
+
+    .install-method {
+      background: var(--navy-card);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px;
+      padding: 1.25rem;
+    }
+
+    .install-method h3 {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--gold);
+      margin-bottom: 0.6rem;
+    }
+
+    .install-method code {
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      display: block;
+      word-break: break-all;
+    }
+
+    /* ── SOCIAL PROOF ── */
+    .stats-bar {
+      padding: 3rem 1.5rem;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .stats-inner {
+      max-width: 800px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+      text-align: center;
+    }
+
+    .stat-item {}
+    .stat-num {
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--gold);
+      line-height: 1;
+    }
+    .stat-label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      padding: 3rem 1.5rem;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      text-align: center;
+    }
+
+    .footer-inner {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .footer-logo {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      font-weight: 700;
+      font-size: 1.1rem;
+      margin-bottom: 1rem;
+    }
+
+    .footer-logo img { width: 28px; height: 28px; }
+
+    .footer-links {
+      display: flex;
+      gap: 1.5rem;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 1.5rem;
+    }
+
+    .footer-links a {
+      color: var(--text-muted);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      font-size: 0.875rem;
+      transition: color 0.2s;
+    }
+
+    .footer-links a:hover { color: var(--gold); }
+
+    .footer-copy {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 768px) {
+      nav { padding: 0.6rem 1rem; }
+      .nav-links .hide-mobile { display: none; }
+
+      .stats-inner { grid-template-columns: repeat(2, 1fr); }
+
+      .agent-inner { grid-template-columns: 1fr; }
+      .agent-inner .agent-text { order: 2; }
+      .agent-inner .agent-demo { order: 1; }
+
+      .terminal-body { font-size: 0.74rem; padding: 1rem; }
+    }
+
+    @media (max-width: 480px) {
+      .install-box { padding: 1rem; }
+      .install-cmd { font-size: 0.8rem; }
+    }
+
+    /* ── ANIMATIONS ── */
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+    .cursor { animation: blink 1s step-end infinite; }
+
+    /* ── TYPING DEMO ANIMATION ── */
+    .typed { overflow: hidden; white-space: nowrap; }
+
+    /* scroll fade-in */
+    .fade-in {
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity 0.5s ease, transform 0.5s ease;
+    }
+
+    .fade-in.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── NAV ── -->
+<nav>
+  <a class="nav-logo" href="/">
+    <img src="icon.svg" alt="Admirarr icon">
+    Admirarr
+  </a>
+  <div class="nav-links">
+    <a href="https://github.com/maxtechera/admirarr" class="hide-mobile">GitHub</a>
+    <a href="https://github.com/maxtechera/admirarr/blob/master/README.md" class="hide-mobile">Docs</a>
+    <a href="https://agentskills.io" class="hide-mobile">Agent Skills</a>
+    <a href="#install" class="nav-cta">Install</a>
+  </div>
+</nav>
+
+<!-- ── HERO ── -->
+<section class="hero">
+  <div class="hero-badge">⚓ v1.0 · MIT License</div>
+  <img class="hero-logo" src="logo-dark.svg" alt="Admirarr logo" width="200" height="40">
+  <h1>Command your <span class="accent">*Arr fleet</span><br>from one terminal</h1>
+  <p class="hero-sub">
+    Deploy, wire, operate, and diagnose your Jellyfin/Plex + *Arr stack from one terminal.
+    One binary, 26 commands, JSON output everywhere — human and agent operated.
+  </p>
+
+  <div class="hero-pills">
+    <span class="pill">⚡ Single binary</span>
+    <span class="pill">🤖 Agent Skills</span>
+    <span class="pill">📊 26 commands</span>
+    <span class="pill">🔧 34 diagnostics</span>
+    <span class="pill">🚀 Zero to media server in 15 min</span>
+  </div>
+
+  <div class="install-box" id="install">
+    <span class="install-prompt">$</span>
+    <span class="install-cmd" id="main-cmd">curl -fsSL https://get.admirarr.dev | sh</span>
+    <button class="copy-btn" onclick="copyInstall()">Copy</button>
+  </div>
+  <p class="install-note">
+    Also: <a href="#install-methods">brew, go install, AUR, deb, Windows</a>
+  </p>
+
+  <div class="hero-btns">
+    <a href="https://github.com/maxtechera/admirarr" class="btn-primary">
+      ⭐ Star on GitHub
+    </a>
+    <a href="#demo" class="btn-secondary">
+      ▶ See it in action
+    </a>
+  </div>
+</section>
+
+<!-- ── STATS ── -->
+<div class="stats-bar">
+  <div class="stats-inner">
+    <div class="stat-item">
+      <div class="stat-num">26</div>
+      <div class="stat-label">Commands</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-num">34</div>
+      <div class="stat-label">Diagnostic checks</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-num">26+</div>
+      <div class="stat-label">Agent platforms</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-num">15 min</div>
+      <div class="stat-label">Zero to fleet</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── DEMO ── -->
+<section class="demo-section fade-in" id="demo">
+  <div class="section-label">Live Demo</div>
+  <h2 class="section-title">Your whole fleet, one command</h2>
+  <p class="section-sub">Run one command. See everything. Fix anything.</p>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="showTab('tab-status')">status</button>
+    <button class="tab-btn" onclick="showTab('tab-doctor')">doctor</button>
+    <button class="tab-btn" onclick="showTab('tab-add')">add-movie</button>
+    <button class="tab-btn" onclick="showTab('tab-setup')">setup</button>
+  </div>
+
+  <!-- status -->
+  <div class="tab-content active" id="tab-status">
+    <div class="terminal">
+      <div class="terminal-bar">
+        <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+        <div class="terminal-title">admirarr status</div>
+      </div>
+      <div class="terminal-body">
+<span class="t-prompt">$</span> <span class="t-cmd">admirarr status</span>
+
+<span class="t-gold">⚓ Fleet Status</span>
+<span class="t-border">──────────────────────────────────────────────</span>
+  <span class="t-key">Services</span>      <span class="t-ok">8/8 online</span>
+  <span class="t-key">Movies</span>        <span class="t-val">1,247</span> <span class="t-dim">(1,189 with files)</span>
+  <span class="t-key">Shows</span>         <span class="t-val">86</span> <span class="t-dim">(2,341 episodes)</span>
+  <span class="t-key">Downloads</span>     <span class="t-val">3 active — 42.1 MB/s</span>
+  <span class="t-key">Disk</span>          <span class="t-val">2.4 TB / 8.0 TB</span> <span class="t-dim">(30%)</span>
+  <span class="t-key">Requests</span>      <span class="t-val">2 pending</span>
+<span class="t-border">──────────────────────────────────────────────</span>
+
+<span class="t-prompt">$</span> <span class="t-cmd">admirarr status --live</span>  <span class="t-dim"># live-updating TUI</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- doctor -->
+  <div class="tab-content" id="tab-doctor">
+    <div class="terminal">
+      <div class="terminal-bar">
+        <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+        <div class="terminal-title">admirarr doctor</div>
+      </div>
+      <div class="terminal-body">
+<span class="t-prompt">$</span> <span class="t-cmd">admirarr doctor</span>
+
+<span class="t-gold">⚓ Doctor — 15 categories, 34 checks</span>
+<span class="t-border">──────────────────────────────────────────────</span>
+  <span class="t-ok">✓ Connectivity</span>      <span class="t-val">All 8 services reachable</span>
+  <span class="t-ok">✓ API Keys</span>          <span class="t-val">All keys valid</span>
+  <span class="t-ok">✓ Containers</span>        <span class="t-val">All running</span>
+  <span class="t-ok">✓ Download Clients</span>  <span class="t-val">qBittorrent connected</span>
+  <span class="t-err">✗ VPN</span>               <span class="t-val">Gluetun tunnel down</span>
+  <span class="t-ok">✓ Media Paths</span>       <span class="t-val">All paths exist</span>
+  <span class="t-ok">✓ Root Folders</span>      <span class="t-val">Radarr + Sonarr configured</span>
+  <span class="t-ok">✓ Indexers</span>          <span class="t-val">4/4 healthy</span>
+  <span class="t-ok">✓ Disk</span>              <span class="t-val">30% used — healthy</span>
+  <span class="t-ok">✓ Hardlinks</span>         <span class="t-val">Enabled</span>
+<span class="t-border">──────────────────────────────────────────────</span>
+  <span class="t-val">33 passed</span> · <span class="t-err">1 failed</span> — <span class="t-gold">run admirarr doctor --fix</span>
+
+<span class="t-prompt">$</span> <span class="t-cmd">admirarr doctor --fix</span>
+  <span class="t-dim">→ Restarting gluetun...</span>
+  <span class="t-ok">✓ VPN tunnel restored</span>  <span class="t-dim">34 passed · 0 failed</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- add-movie -->
+  <div class="tab-content" id="tab-add">
+    <div class="terminal">
+      <div class="terminal-bar">
+        <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+        <div class="terminal-title">admirarr add-movie</div>
+      </div>
+      <div class="terminal-body">
+<span class="t-prompt">$</span> <span class="t-cmd">admirarr add-movie "Dune"</span>
+
+  <span class="t-dim">Searching Radarr...</span>
+  <span class="t-key">1.</span> <span class="t-val">Dune: Part One (2021)</span>  <span class="t-dim">8K Remux · 45.2 GB</span>
+  <span class="t-key">2.</span> <span class="t-val">Dune: Part Two (2024)</span>  <span class="t-dim">4K HDR · 22.1 GB</span>
+  <span class="t-key">3.</span> <span class="t-val">Dune (1984)</span>            <span class="t-dim">BluRay · 12.4 GB</span>
+
+<span class="t-prompt">&gt;</span> <span class="t-cmd">1</span>
+
+  <span class="t-ok">✓ Added Dune: Part One</span>
+  <span class="t-dim">→ Quality: UHD BluRay Remux</span>
+  <span class="t-dim">→ Searching indexers...</span>
+  <span class="t-ok">✓ Found release — queued in qBittorrent</span>
+
+<span class="t-prompt">$</span> <span class="t-cmd">admirarr add-show "Severance"</span>
+  <span class="t-ok">✓ Added Severance — monitoring seasons 1 + 2</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- setup -->
+  <div class="tab-content" id="tab-setup">
+    <div class="terminal">
+      <div class="terminal-bar">
+        <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+        <div class="terminal-title">admirarr setup</div>
+      </div>
+      <div class="terminal-body">
+<span class="t-prompt">$</span> <span class="t-cmd">admirarr setup</span>
+
+<span class="t-gold">⚓ Admirarr Setup — 12 phases</span>
+<span class="t-border">──────────────────────────────</span>
+  <span class="t-ok">✓</span> <span class="t-key">1/12</span> <span class="t-val">Detect environment</span>
+  <span class="t-ok">✓</span> <span class="t-key">2/12</span> <span class="t-val">Select services</span>
+  <span class="t-ok">✓</span> <span class="t-key">3/12</span> <span class="t-val">Deploy Docker Compose</span>
+  <span class="t-ok">✓</span> <span class="t-key">4/12</span> <span class="t-val">Connectivity check</span>
+  <span class="t-ok">✓</span> <span class="t-key">5/12</span> <span class="t-val">API key discovery</span>
+  <span class="t-ok">✓</span> <span class="t-key">6/12</span> <span class="t-val">Download clients</span>
+  <span class="t-ok">✓</span> <span class="t-key">7/12</span> <span class="t-val">Root folders</span>
+  <span class="t-ok">✓</span> <span class="t-key">8/12</span> <span class="t-val">Prowlarr wiring</span>
+  <span class="t-ok">✓</span> <span class="t-key">9/12</span> <span class="t-val">Seerr wiring</span>
+  <span class="t-ok">✓</span> <span class="t-key">10/12</span> <span class="t-val">Bazarr wiring</span>
+  <span class="t-ok">✓</span> <span class="t-key">11/12</span> <span class="t-val">Quality profiles</span>
+  <span class="t-ok">✓</span> <span class="t-key">12/12</span> <span class="t-val">Write config</span>
+<span class="t-border">──────────────────────────────</span>
+  <span class="t-gold">✓ Fleet deployed in 13m 42s — 8/8 services online</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── FEATURES ── -->
+<section class="features-section fade-in" id="features">
+  <div class="section-label">Features</div>
+  <h2 class="section-title">Everything your fleet needs</h2>
+  <p class="section-sub">One binary handles the full lifecycle — from first deploy to daily operation.</p>
+
+  <div class="features-grid">
+
+    <div class="feature-card">
+      <div class="feature-icon">🚀</div>
+      <h3>Zero to fleet in 15 minutes</h3>
+      <p>12-phase guided setup deploys Jellyfin/Plex + all *Arr services, wires them together, and writes config — no manual clicking.</p>
+      <span class="feature-tag">admirarr setup</span>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon">🩺</div>
+      <h3>34-check diagnostic engine</h3>
+      <p>15 categories: connectivity, API keys, containers, VPN, media paths, indexers, hardlinks, disk, cross-service wiring, and more. AI-powered repair built in.</p>
+      <span class="feature-tag">admirarr doctor --fix</span>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon">📊</div>
+      <h3>Fleet at a glance</h3>
+      <p>Services, libraries, active downloads, disk usage, and pending requests — one command. Live-updating TUI for continuous monitoring.</p>
+      <span class="feature-tag">admirarr status --live</span>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon">🤖</div>
+      <h3>Agent Skills compatible</h3>
+      <p>Ships a SKILL.md following the open standard used by 26+ platforms. Your AI agent reads it, discovers commands, and operates your fleet automatically.</p>
+      <span class="feature-tag">SKILL.md</span>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon">📦</div>
+      <h3>Single binary, zero deps</h3>
+      <p>One Go binary. Works in SSH sessions, tmux, CI pipelines, agent sandboxes, and anywhere a shell runs. No runtime, no Node, no Python.</p>
+      <span class="feature-tag">go · single binary</span>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon">🔧</div>
+      <h3>JSON output everywhere</h3>
+      <p>Every command supports <code>-o json</code> for structured output. Pipe to jq, feed to scripts, or let agents parse results programmatically.</p>
+      <span class="feature-tag">-o json</span>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon">🎬</div>
+      <h3>Full media operations</h3>
+      <p>Add movies and shows by name, search indexers, manage downloads, browse libraries, handle requests, and sync quality profiles from TRaSH Guide.</p>
+      <span class="feature-tag">add-movie · search · queue</span>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon">🔌</div>
+      <h3>10 + 14 optional services</h3>
+      <p>Default: Jellyfin, Radarr, Sonarr, Prowlarr, qBittorrent, Gluetun, Seerr, Bazarr, FlareSolverr, Watchtower. Optional: Plex, Tdarr, Tautulli, Lidarr, and more.</p>
+      <span class="feature-tag">24 services total</span>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon">⚡</div>
+      <h3>Idempotent by design</h3>
+      <p>Run setup multiple times safely — it detects existing services, wires what's missing, and converges to the desired state without clobbering your config.</p>
+      <span class="feature-tag">converge · repair · extend</span>
+    </div>
+
+  </div>
+</section>
+
+<!-- ── AGENT ── -->
+<section class="agent-section fade-in" id="agents">
+  <div class="agent-inner">
+    <div class="agent-text">
+      <div class="section-label" style="text-align:left;">Agent Skills</div>
+      <h2 class="section-title" style="text-align:left; font-size: clamp(1.6rem, 3vw, 2.2rem);">Your agent already<br>knows Admirarr</h2>
+      <p style="color: var(--text-muted); margin-bottom: 1.5rem; font-size: 0.95rem; line-height: 1.7;">
+        Admirarr ships a <code style="color:var(--gold); font-family:var(--mono);">SKILL.md</code> following the 
+        <a href="https://agentskills.io" style="color:var(--gold);">Agent Skills</a> open standard — 
+        the same spec used by 26+ platforms. Install once, works everywhere.
+      </p>
+      <div class="install-box" style="max-width: 100%; margin-bottom: 1rem;">
+        <span class="install-prompt">$</span>
+        <span class="install-cmd">npx skills add maxtechera/admirarr</span>
+        <button class="copy-btn" onclick="copyAgent()">Copy</button>
+      </div>
+      <p style="font-size: 0.8rem; color: var(--text-muted);">
+        Or: <code style="font-family:var(--mono); color: var(--text-muted);">clawdhub install admirarr</code> for OpenClaw
+      </p>
+
+      <div class="agent-platforms">
+        <div class="platform-chip"><div class="dot-ok"></div>Claude Code</div>
+        <div class="platform-chip"><div class="dot-ok"></div>OpenClaw</div>
+        <div class="platform-chip"><div class="dot-ok"></div>OpenCode</div>
+        <div class="platform-chip"><div class="dot-ok"></div>Codex</div>
+        <div class="platform-chip"><div class="dot-ok"></div>Gemini CLI</div>
+        <div class="platform-chip"><div class="dot-ok"></div>Cursor</div>
+        <div class="platform-chip"><div class="dot-ok"></div>VS Code</div>
+        <div class="platform-chip"><div class="dot-ok"></div>Aider</div>
+      </div>
+    </div>
+
+    <div class="agent-demo">
+      <div class="terminal">
+        <div class="terminal-bar">
+          <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+          <div class="terminal-title">agent + admirarr</div>
+        </div>
+        <div class="terminal-body" style="font-size: 0.78rem;">
+<span class="t-dim"># "My downloads seem stuck"</span>
+
+<span class="t-gold">→ agent calls:</span>
+<span class="t-cmd">admirarr doctor -o json</span>
+
+<span class="t-gold">→ finds:</span>
+<span class="t-err">✗ VPN  Gluetun tunnel down</span>
+
+<span class="t-gold">→ agent calls:</span>
+<span class="t-cmd">admirarr restart gluetun</span>
+
+<span class="t-gold">→ verifies:</span>
+<span class="t-cmd">admirarr doctor -o json</span>
+<span class="t-ok">✓ 34/34 passed</span>
+
+<span class="t-dim"># zero human intervention</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── INSTALL METHODS ── -->
+<section class="install-section fade-in" id="install-methods">
+  <div class="section-label">Install</div>
+  <h2 class="section-title">Get Admirarr</h2>
+  <p class="section-sub">One binary, no runtime. Pick your platform.</p>
+
+  <div class="install-grid">
+    <div class="install-method">
+      <h3>Linux / macOS (curl)</h3>
+      <code>curl -fsSL https://get.admirarr.dev | sh</code>
+    </div>
+    <div class="install-method">
+      <h3>Homebrew</h3>
+      <code>brew install maxtechera/tap/admirarr</code>
+    </div>
+    <div class="install-method">
+      <h3>Go</h3>
+      <code>go install github.com/maxtechera/admirarr@latest</code>
+    </div>
+    <div class="install-method">
+      <h3>Arch AUR</h3>
+      <code>yay -S admirarr-bin</code>
+    </div>
+    <div class="install-method">
+      <h3>Debian / Ubuntu</h3>
+      <code>dpkg -i admirarr_*.deb</code>
+    </div>
+    <div class="install-method">
+      <h3>Windows PowerShell</h3>
+      <code>irm https://get.admirarr.dev/windows | iex</code>
+    </div>
+  </div>
+</section>
+
+<!-- ── CTA ── -->
+<section style="padding: 5rem 1.5rem; text-align: center; background: rgba(212,168,67,0.04); border-top: 1px solid rgba(212,168,67,0.15);">
+  <div style="max-width: 600px; margin: 0 auto;">
+    <div class="section-label">Get Started</div>
+    <h2 class="section-title">Command your fleet today</h2>
+    <p class="section-sub">Free, open source, MIT licensed. One command and you're running.</p>
+    <div class="install-box" style="margin: 1.5rem auto 1rem;">
+      <span class="install-prompt">$</span>
+      <span class="install-cmd">curl -fsSL https://get.admirarr.dev | sh</span>
+      <button class="copy-btn" onclick="copyInstall()">Copy</button>
+    </div>
+    <div class="hero-btns">
+      <a href="https://github.com/maxtechera/admirarr" class="btn-primary">⭐ Star on GitHub</a>
+      <a href="https://github.com/maxtechera/admirarr/blob/master/README.md" class="btn-secondary">📖 Read the docs</a>
+    </div>
+  </div>
+</section>
+
+<!-- ── FOOTER ── -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-logo">
+      <img src="icon.svg" alt="Admirarr icon">
+      Admirarr
+    </div>
+    <div class="footer-links">
+      <a href="https://github.com/maxtechera/admirarr">GitHub</a>
+      <a href="https://github.com/maxtechera/admirarr/blob/master/README.md">Docs</a>
+      <a href="https://github.com/maxtechera/admirarr/blob/master/SKILL.md">SKILL.md</a>
+      <a href="https://agentskills.io">Agent Skills</a>
+      <a href="https://github.com/maxtechera/admirarr/blob/master/LICENSE">MIT License</a>
+    </div>
+    <p class="footer-copy">Built with ⚓ by <a href="https://github.com/maxtechera" style="color:var(--gold); text-decoration:underline; text-underline-offset:3px;">maxtechera</a></p>
+  </div>
+</footer>
+
+<script>
+  // Tab switching
+  function showTab(id) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    event.target.classList.add('active');
+  }
+
+  // Copy install command
+  function copyInstall() {
+    navigator.clipboard.writeText('curl -fsSL https://get.admirarr.dev | sh').then(() => {
+      const btns = document.querySelectorAll('.copy-btn');
+      btns.forEach(b => { b.textContent = 'Copied!'; b.classList.add('copied'); });
+      setTimeout(() => {
+        btns.forEach(b => { b.textContent = 'Copy'; b.classList.remove('copied'); });
+      }, 2000);
+    });
+  }
+
+  function copyAgent() {
+    navigator.clipboard.writeText('npx skills add maxtechera/admirarr').then(() => {
+      event.target.textContent = 'Copied!';
+      event.target.classList.add('copied');
+      setTimeout(() => {
+        event.target.textContent = 'Copy';
+        event.target.classList.remove('copied');
+      }, 2000);
+    });
+  }
+
+  // Scroll fade-in
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+      }
+    });
+  }, { threshold: 0.1 });
+
+  document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+</script>
+
+</body>
+</html>

@@ -84,7 +84,7 @@ func (c *Client) Delete(deleteFiles bool, hashes ...string) error {
 	if err != nil {
 		return err
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	return nil
 }
 
@@ -113,7 +113,7 @@ func (c *Client) postHashes(endpoint string, hashes []string) error {
 	if err != nil {
 		return err
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
 		return fmt.Errorf("qBittorrent returned %d", resp.StatusCode)

@@ -95,6 +95,6 @@ func runDoctorChecks() *doctor.Result {
 	os.Stdout = devNull
 	result := doctor.RunChecks()
 	os.Stdout = origStdout
-	devNull.Close()
+	_ = devNull.Close()
 	return result
 }

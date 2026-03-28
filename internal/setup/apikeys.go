@@ -135,7 +135,7 @@ func validateKey(service, key string, svc *ServiceState) bool {
 		if err != nil {
 			return false
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		return resp.StatusCode == 200
 	case "tautulli":
 		url = fmt.Sprintf("http://%s:%d/api/v2?apikey=%s&cmd=status", svc.Host, svc.Port, key)
@@ -149,7 +149,7 @@ func validateKey(service, key string, svc *ServiceState) bool {
 		if err != nil {
 			return false
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		return resp.StatusCode == 200
 	case "bazarr":
 		req, err := http.NewRequest("GET", fmt.Sprintf("http://%s:%d/api/system/status", svc.Host, svc.Port), nil)
@@ -161,7 +161,7 @@ func validateKey(service, key string, svc *ServiceState) bool {
 		if err != nil {
 			return false
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		return resp.StatusCode == 200
 	case "plex":
 		req, err := http.NewRequest("GET", fmt.Sprintf("http://%s:%d/identity", svc.Host, svc.Port), nil)
@@ -174,7 +174,7 @@ func validateKey(service, key string, svc *ServiceState) bool {
 		if err != nil {
 			return false
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		return resp.StatusCode == 200
 	case "sabnzbd":
 		url = fmt.Sprintf("http://%s:%d/api?mode=version&apikey=%s&output=json", svc.Host, svc.Port, key)
@@ -186,7 +186,7 @@ func validateKey(service, key string, svc *ServiceState) bool {
 	if err != nil {
 		return false
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	return resp.StatusCode == 200
 }
 
@@ -209,7 +209,7 @@ func initJellyfin(state *SetupState, svc *ServiceState, r *StepResult) bool {
 		return false
 	}
 	pubBody, _ := io.ReadAll(pubResp.Body)
-	pubResp.Body.Close()
+	_ = pubResp.Body.Close()
 
 	var pubInfo struct {
 		StartupWizardCompleted bool `json:"StartupWizardCompleted"`
@@ -280,7 +280,7 @@ func initJellyfin(state *SetupState, svc *ServiceState, r *StepResult) bool {
 		r.errf("jellyfin: startup config failed: %v", err)
 		return false
 	}
-	cfgResp.Body.Close()
+	_ = cfgResp.Body.Close()
 	if cfgResp.StatusCode >= 400 {
 		r.errf("jellyfin: startup config returned %d", cfgResp.StatusCode)
 		return false
@@ -296,7 +296,7 @@ func initJellyfin(state *SetupState, svc *ServiceState, r *StepResult) bool {
 		r.errf("jellyfin: startup user creation failed: %v", err)
 		return false
 	}
-	userResp.Body.Close()
+	_ = userResp.Body.Close()
 	if userResp.StatusCode >= 400 {
 		r.errf("jellyfin: startup user creation returned %d", userResp.StatusCode)
 		return false
@@ -308,7 +308,7 @@ func initJellyfin(state *SetupState, svc *ServiceState, r *StepResult) bool {
 		r.errf("jellyfin: startup complete failed: %v", err)
 		return false
 	}
-	completeResp.Body.Close()
+	_ = completeResp.Body.Close()
 	if completeResp.StatusCode >= 400 {
 		r.errf("jellyfin: startup complete returned %d", completeResp.StatusCode)
 		return false
@@ -329,7 +329,7 @@ func initJellyfin(state *SetupState, svc *ServiceState, r *StepResult) bool {
 		return false
 	}
 	authBody, _ := io.ReadAll(authHTTPResp.Body)
-	authHTTPResp.Body.Close()
+	_ = authHTTPResp.Body.Close()
 
 	var authResp struct {
 		AccessToken string `json:"AccessToken"`
@@ -369,7 +369,7 @@ func findOrCreateJellyfinKey(c *http.Client, base, sessionToken string) string {
 		return ""
 	}
 	body, _ := io.ReadAll(resp.Body)
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	var keysResp struct {
 		Items []struct {
@@ -395,7 +395,7 @@ func findOrCreateJellyfinKey(c *http.Client, base, sessionToken string) string {
 	if err != nil {
 		return ""
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	// Re-fetch to get the new key
 	req, _ = http.NewRequest("GET", base+"/Auth/Keys", nil)
@@ -405,7 +405,7 @@ func findOrCreateJellyfinKey(c *http.Client, base, sessionToken string) string {
 		return ""
 	}
 	body, _ = io.ReadAll(resp.Body)
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	if err := json.Unmarshal(body, &keysResp); err != nil {
 		return ""
@@ -434,7 +434,7 @@ func recoverJellyfinKey(c *http.Client, base, username, password string) string 
 		return ""
 	}
 	body, _ := io.ReadAll(resp.Body)
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	var authResp struct {
 		AccessToken string `json:"AccessToken"`
