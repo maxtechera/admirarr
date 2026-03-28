@@ -11,33 +11,6 @@ import (
 	"github.com/spf13/viper"
 )
 
-// mockServiceMux creates a handler that responds to common *Arr API endpoints.
-func mockServiceMux(apiVer string) http.Handler {
-	mux := http.NewServeMux()
-
-	// Health endpoint
-	mux.HandleFunc("/api/"+apiVer+"/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]struct{}{})
-	})
-
-	// System status
-	mux.HandleFunc("/api/"+apiVer+"/system/status", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"version": "5.0.0"})
-	})
-
-	// Root folders
-	mux.HandleFunc("/api/"+apiVer+"/rootfolder", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]map[string]interface{}{
-			{"id": 1, "path": "/data/media/movies", "accessible": true, "freeSpace": 500000000000},
-		})
-	})
-
-	return mux
-}
-
 // configureTestService points a service to the test server.
 func configureTestService(t *testing.T, service string, ts *httptest.Server) {
 	t.Helper()

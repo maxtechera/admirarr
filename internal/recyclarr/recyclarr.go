@@ -125,12 +125,12 @@ func dockerVersion(container string) string {
 
 // VerifyResult holds the result of verifying Recyclarr's applied config.
 type VerifyResult struct {
-	Service          string
-	QualityProfiles  int
-	CustomFormats    int
-	ProfilesApplied  bool
-	FormatsApplied   bool
-	Issues           []string
+	Service         string
+	QualityProfiles int
+	CustomFormats   int
+	ProfilesApplied bool
+	FormatsApplied  bool
+	Issues          []string
 }
 
 func (v VerifyResult) String() string {

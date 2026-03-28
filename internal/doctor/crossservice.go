@@ -24,9 +24,7 @@ func checkCrossService(r *Result) {
 				r.ChecksPassed++
 				fmt.Printf("  %s [prowlarr → %s] %s\n", ui.Ok("✓"), res.Target, res.Detail)
 			case "failed":
-				r.Issues = append(r.Issues, Issue{Description:
-					fmt.Sprintf("PROWLARR SYNC: %s sync target — %s. Run admirarr setup to fix.", res.Target, res.Detail),
-				})
+				r.Issues = append(r.Issues, Issue{Description: fmt.Sprintf("PROWLARR SYNC: %s sync target — %s. Run admirarr setup to fix.", res.Target, res.Detail)})
 				fmt.Printf("  %s [prowlarr → %s] %s\n", ui.Err("✗"), res.Target, ui.Err(res.Detail))
 			}
 		}
@@ -39,9 +37,7 @@ func checkCrossService(r *Result) {
 				r.ChecksPassed++
 				fmt.Printf("  %s [prowlarr → flaresolverr] %s\n", ui.Ok("✓"), flareResult.Detail)
 			case "failed":
-				r.Issues = append(r.Issues, Issue{Description:
-					fmt.Sprintf("FLARESOLVERR: %s. Run admirarr setup to configure.", flareResult.Detail),
-				})
+				r.Issues = append(r.Issues, Issue{Description: fmt.Sprintf("FLARESOLVERR: %s. Run admirarr setup to configure.", flareResult.Detail)})
 				fmt.Printf("  %s [prowlarr → flaresolverr] %s\n", ui.Err("✗"), ui.Err(flareResult.Detail))
 			}
 		}
@@ -86,9 +82,7 @@ func checkBazarrConnections(r *Result) {
 		r.ChecksPassed++
 		fmt.Printf("  %s [bazarr → radarr] connected\n", ui.Ok("✓"))
 	} else if config.IsConfigured("radarr") {
-		r.Issues = append(r.Issues, Issue{Description:
-			"BAZARR: Not connected to Radarr. Configure in Bazarr Settings → Radarr.",
-		})
+		r.Issues = append(r.Issues, Issue{Description: "BAZARR: Not connected to Radarr. Configure in Bazarr Settings → Radarr."})
 		fmt.Printf("  %s [bazarr → radarr] %s\n", ui.Err("✗"), ui.Err("not connected"))
 	}
 
@@ -96,9 +90,7 @@ func checkBazarrConnections(r *Result) {
 		r.ChecksPassed++
 		fmt.Printf("  %s [bazarr → sonarr] connected\n", ui.Ok("✓"))
 	} else if config.IsConfigured("sonarr") {
-		r.Issues = append(r.Issues, Issue{Description:
-			"BAZARR: Not connected to Sonarr. Configure in Bazarr Settings → Sonarr.",
-		})
+		r.Issues = append(r.Issues, Issue{Description: "BAZARR: Not connected to Sonarr. Configure in Bazarr Settings → Sonarr."})
 		fmt.Printf("  %s [bazarr → sonarr] %s\n", ui.Err("✗"), ui.Err("not connected"))
 	}
 }
@@ -121,9 +113,7 @@ func checkSeerrConnections(r *Result) {
 		r.ChecksPassed++
 		fmt.Printf("  %s [seerr] initialized and configured\n", ui.Ok("✓"))
 	} else {
-		r.Issues = append(r.Issues, Issue{Description:
-			"SEERR: Not initialized. Complete setup at the Seerr web UI.",
-		})
+		r.Issues = append(r.Issues, Issue{Description: "SEERR: Not initialized. Complete setup at the Seerr web UI."})
 		fmt.Printf("  %s [seerr] %s\n", ui.Err("✗"), ui.Err("not initialized"))
 	}
 }

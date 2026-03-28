@@ -1,0 +1,10 @@
+version: "2"
+
+# NOTE: This is the initial golangci-lint v2 config.
+# The codebase has pre-existing lint debt from errcheck, govet, staticcheck,
+# ineffassign, unused, and gofmt — all hidden by the prior broken Go 1.24 config.
+# The lint job runs with continue-on-error: true while the debt is cleaned up.
+# See: https://linear.app/neo/issue/NEO-417
+
+linters:
+  default: standard

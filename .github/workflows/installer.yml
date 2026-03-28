@@ -1,0 +1,40 @@
+name: Publish Installer
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - install.sh
+      - install.ps1
+      - .github/workflows/installer.yml
+      - packaging/pages/**
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build installer site
+        run: |
+          mkdir -p _site
+          cp install.sh _site/install.sh
+          cp install.ps1 _site/install.ps1
+          # 404.html = shell script (GitHub Pages serves 404.html for root,
+          # making `curl https://get.admirarr.dev | sh` work natively)
+          cp install.sh _site/404.html
+          cp packaging/pages/index.html _site/index.html
+          echo "get.admirarr.dev" > _site/CNAME
+          touch _site/.nojekyll
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./_site
+          force_orphan: true
+          commit_message: "chore: publish installer [skip ci]"

@@ -16,7 +16,6 @@ import (
 	"github.com/maxtechera/admirarr/internal/ui"
 )
 
-
 // ConfigureDownloadClients runs Phase 5: download client + qBittorrent configuration.
 func ConfigureDownloadClients(state *SetupState) StepResult {
 	r := StepResult{Name: "Download Clients"}
@@ -321,7 +320,6 @@ func titleCase(s string) string {
 	}
 	return strings.ToUpper(s[:1]) + s[1:]
 }
-
 
 func checkDownloadDirs(state *SetupState, r *StepResult) {
 	dataPath := state.DataPath

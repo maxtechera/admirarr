@@ -260,7 +260,9 @@ func (c *Client) TestAllIndexers() ([]IndexerTestResult, error) {
 }
 
 // IndexerProxies fetches indexer proxy configurations.
-func (c *Client) IndexerProxies() ([]struct{ Tags []int `json:"tags"` }, error) {
+func (c *Client) IndexerProxies() ([]struct {
+	Tags []int `json:"tags"`
+}, error) {
 	var data []struct {
 		Tags []int `json:"tags"`
 	}

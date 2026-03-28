@@ -328,7 +328,6 @@ func fixHostMismatch(desc string) bool {
 		if inService && strings.HasPrefix(trimmed, "host:") {
 			indent := line[:len(line)-len(strings.TrimLeft(line, " "))]
 			lines[i] = fmt.Sprintf(`%shost: %s`, indent, actualHost)
-			inService = false
 			break
 		}
 		// If we hit another service block, stop looking
@@ -408,8 +407,8 @@ func fixVPNCredentials() bool {
 	// Write credentials to .env
 	creds := map[string]string{
 		"WIREGUARD_PRIVATE_KEY": privateKey,
-		"WIREGUARD_ADDRESSES":  device.IPv4Address,
-		"MULLVAD_ACCOUNT":      acct.Number,
+		"WIREGUARD_ADDRESSES":   device.IPv4Address,
+		"MULLVAD_ACCOUNT":       acct.Number,
 	}
 	opts := migrate.ComposeOpts{
 		VPNProvider: "mullvad",

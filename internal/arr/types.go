@@ -217,11 +217,11 @@ type AuthorStats struct {
 
 // Release represents a Radarr release search result.
 type Release struct {
-	Title      string   `json:"title"`
-	Size       int64    `json:"size"`
-	Seeders    int      `json:"seeders"`
-	Rejected   bool     `json:"rejected"`
-	Quality    struct {
+	Title    string `json:"title"`
+	Size     int64  `json:"size"`
+	Seeders  int    `json:"seeders"`
+	Rejected bool   `json:"rejected"`
+	Quality  struct {
 		Quality struct {
 			Name string `json:"name"`
 		} `json:"quality"`

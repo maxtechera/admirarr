@@ -1,0 +1,20 @@
+# Maintainer: Max Techera <max@maxtechera.com>
+pkgname=admirarr-bin
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Command your fleet — CLI for Plex + *Arr media server stack"
+arch=('x86_64' 'aarch64')
+url="https://github.com/maxtechera/admirarr"
+license=('MIT')
+provides=('admirarr')
+conflicts=('admirarr')
+
+source_x86_64=("${pkgname}-${pkgver}-x86_64.tar.gz::https://github.com/maxtechera/admirarr/releases/download/v${pkgver}/admirarr_${pkgver}_linux_amd64.tar.gz")
+source_aarch64=("${pkgname}-${pkgver}-aarch64.tar.gz::https://github.com/maxtechera/admirarr/releases/download/v${pkgver}/admirarr_${pkgver}_linux_arm64.tar.gz")
+
+sha256sums_x86_64=('SKIP')
+sha256sums_aarch64=('SKIP')
+
+package() {
+    install -Dm755 admirarr "${pkgdir}/usr/bin/admirarr"
+}

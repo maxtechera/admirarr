@@ -50,8 +50,8 @@ type VPNConfig struct {
 
 // Config holds the full application configuration.
 type Config struct {
-	Host           string                   `mapstructure:"host"`           // global host IP for remote services
-	WSLGateway     string                   `mapstructure:"wsl_gateway"`    // WSL gateway for localhost_only services
+	Host           string                   `mapstructure:"host"`        // global host IP for remote services
+	WSLGateway     string                   `mapstructure:"wsl_gateway"` // WSL gateway for localhost_only services
 	DataPath       string                   `mapstructure:"data_path"`
 	ComposePath    string                   `mapstructure:"compose_path"`
 	Services       map[string]ServiceConfig `mapstructure:"services"`
@@ -264,11 +264,11 @@ func CandidateHosts(name string) []string {
 		}
 	}
 
-	add(svc.Host)      // configured host first
-	add(c.Host)        // global host
-	add(c.WSLGateway)  // WSL gateway
-	add("localhost")   // always try localhost
-	add("127.0.0.1")   // in case localhost doesn't resolve
+	add(svc.Host)     // configured host first
+	add(c.Host)       // global host
+	add(c.WSLGateway) // WSL gateway
+	add("localhost")  // always try localhost
+	add("127.0.0.1")  // in case localhost doesn't resolve
 
 	return hosts
 }

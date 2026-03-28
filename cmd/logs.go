@@ -155,9 +155,10 @@ func printLogRecords(service string, records []struct {
 			t = t[:19]
 		}
 		colorFn := ui.Dim
-		if rec.Level == "error" {
+		switch rec.Level {
+		case "error":
 			colorFn = ui.Err
-		} else if rec.Level == "warn" {
+		case "warn":
 			colorFn = ui.Warn
 		}
 		fmt.Printf("  %s %8s  %s\n", ui.Dim(t), colorFn(rec.Level), msg)
@@ -283,9 +284,10 @@ func fetchQBittorrentLogs(service string) bool {
 				msg = msg[:100]
 			}
 			colorFn := ui.Dim
-			if rec.Level == "error" {
+			switch rec.Level {
+			case "error":
 				colorFn = ui.Err
-			} else if rec.Level == "warn" {
+			case "warn":
 				colorFn = ui.Warn
 			}
 			fmt.Printf("  %s %8s  %s\n", ui.Dim(rec.Time), colorFn(rec.Level), msg)
@@ -352,9 +354,10 @@ func fetchTautulliLogs(service string) bool {
 				msg = msg[:100]
 			}
 			colorFn := ui.Dim
-			if rec.Level == "error" {
+			switch rec.Level {
+			case "error":
 				colorFn = ui.Err
-			} else if rec.Level == "warn" || rec.Level == "warning" {
+			case "warn", "warning":
 				colorFn = ui.Warn
 			}
 			t := rec.Time

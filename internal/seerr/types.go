@@ -10,10 +10,10 @@ type RequestPage struct {
 
 // Request represents a Seerr media request.
 type Request struct {
-	ID     int  `json:"id"`
-	Status int  `json:"status"`
+	ID     int    `json:"id"`
+	Status int    `json:"status"`
 	Type   string `json:"type"`
-	Is4K   bool `json:"is4k"`
+	Is4K   bool   `json:"is4k"`
 	Media  struct {
 		MediaType string `json:"mediaType"`
 		TmdbID    int    `json:"tmdbId"`

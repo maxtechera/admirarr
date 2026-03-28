@@ -127,16 +127,7 @@ func EnsureDownloadClient(service, category, expectedHost string) WireResult {
 		existingCategory = fmt.Sprintf("%v", v)
 	}
 
-	needsFix := false
-	if host != expectedHost {
-		needsFix = true
-	}
-	if port != "8080" {
-		needsFix = true
-	}
-	if existingCategory != category {
-		needsFix = true
-	}
+	needsFix := host != expectedHost || port != "8080" || existingCategory != category
 
 	if !needsFix {
 		return WireResult{

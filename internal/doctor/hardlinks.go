@@ -1,3 +1,5 @@
+//go:build !windows
+
 package doctor
 
 import (
@@ -48,17 +50,15 @@ func checkHardlinks(r *Result) {
 		fmt.Printf("  %s TRaSH directory structure: %s missing: %s\n",
 			ui.Warn("!"), ui.Warn("partial"),
 			strings.Join(missingDirs, ", "))
-		r.Issues = append(r.Issues, Issue{Description:
-			fmt.Sprintf("DIRECTORY STRUCTURE: Missing TRaSH Guides directories under %s: %s. "+
-				"See https://trash-guides.info/Hardlinks/How-to-setup-for/Docker/",
-				dataPath, strings.Join(missingDirs, ", ")),
+		r.Issues = append(r.Issues, Issue{Description: fmt.Sprintf("DIRECTORY STRUCTURE: Missing TRaSH Guides directories under %s: %s. "+
+			"See https://trash-guides.info/Hardlinks/How-to-setup-for/Docker/",
+			dataPath, strings.Join(missingDirs, ", ")),
 		})
 	} else {
 		fmt.Printf("  %s TRaSH directory structure: %s at %s\n",
 			ui.Err("✗"), ui.Err("not found"), dataPath)
-		r.Issues = append(r.Issues, Issue{Description:
-			fmt.Sprintf("DIRECTORY STRUCTURE: No TRaSH Guides directories found under %s. "+
-				"See https://trash-guides.info/Hardlinks/How-to-setup-for/Docker/", dataPath),
+		r.Issues = append(r.Issues, Issue{Description: fmt.Sprintf("DIRECTORY STRUCTURE: No TRaSH Guides directories found under %s. "+
+			"See https://trash-guides.info/Hardlinks/How-to-setup-for/Docker/", dataPath),
 		})
 	}
 
@@ -72,10 +72,10 @@ func checkHardlinks(r *Result) {
 	if err1 == nil && err2 == nil {
 		var tDev, mDev uint64
 		if sys, ok := torrentsStat.Sys().(*syscall.Stat_t); ok {
-			tDev = sys.Dev
+			tDev = uint64(sys.Dev) //nolint:unconvert // sys.Dev is int32 on linux/arm, uint64 on amd64
 		}
 		if sys, ok := mediaStat.Sys().(*syscall.Stat_t); ok {
-			mDev = sys.Dev
+			mDev = uint64(sys.Dev) //nolint:unconvert // sys.Dev is int32 on linux/arm, uint64 on amd64
 		}
 
 		if tDev != 0 && mDev != 0 {
@@ -83,10 +83,9 @@ func checkHardlinks(r *Result) {
 				r.ChecksPassed++
 				fmt.Printf("  %s Same filesystem: torrents + media (hardlinks possible)\n", ui.Ok("✓"))
 			} else {
-				r.Issues = append(r.Issues, Issue{Description:
-					fmt.Sprintf("CROSS-FILESYSTEM: %s and %s are on different devices. "+
-						"Hardlinks won't work — Sonarr/Radarr will copy instead of link. "+
-						"Mount both under the same volume.", torrentsPath, mediaPath),
+				r.Issues = append(r.Issues, Issue{Description: fmt.Sprintf("CROSS-FILESYSTEM: %s and %s are on different devices. "+
+					"Hardlinks won't work — Sonarr/Radarr will copy instead of link. "+
+					"Mount both under the same volume.", torrentsPath, mediaPath),
 				})
 				fmt.Printf("  %s %s\n", ui.Err("✗"), ui.Err("torrents and media on different filesystems (hardlinks impossible)"))
 			}
@@ -105,9 +104,8 @@ func checkHardlinks(r *Result) {
 				r.ChecksPassed++
 				fmt.Printf("  %s qBittorrent save path: %s (inside data/torrents)\n", ui.Ok("✓"), prefs.SavePath)
 			} else {
-				r.Issues = append(r.Issues, Issue{Description:
-					fmt.Sprintf("QBIT SAVE PATH: qBittorrent save path is %s — expected under /data/torrents for TRaSH Guides hardlink structure. "+
-						"Update in qBittorrent Options → Downloads → Default Save Path.", prefs.SavePath),
+				r.Issues = append(r.Issues, Issue{Description: fmt.Sprintf("QBIT SAVE PATH: qBittorrent save path is %s — expected under /data/torrents for TRaSH Guides hardlink structure. "+
+					"Update in qBittorrent Options → Downloads → Default Save Path.", prefs.SavePath),
 				})
 				fmt.Printf("  %s qBittorrent save path: %s %s\n",
 					ui.Warn("!"), prefs.SavePath, ui.Warn("(not under /data/torrents)"))

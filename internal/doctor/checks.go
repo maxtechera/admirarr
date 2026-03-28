@@ -20,8 +20,8 @@ import (
 // Issue represents a diagnostic issue found.
 type Issue struct {
 	Description string
-	Category    string   // e.g. "service_down", "container_down", "missing_key", "quality", "deploy"
-	Service     string   // service name if applicable
+	Category    string       // e.g. "service_down", "container_down", "missing_key", "quality", "deploy"
+	Service     string       // service name if applicable
 	FixFunc     func() error // built-in auto-fix, nil if manual only
 }
 
@@ -82,9 +82,8 @@ func checkConnectivity(r *Result) {
 			speed := ui.Ok(fmt.Sprintf("%dms", ss.LatencyMs))
 			if ss.LatencyMs > 2000 {
 				speed = ui.Warn(fmt.Sprintf("%dms (slow)", ss.LatencyMs))
-				r.Issues = append(r.Issues, Issue{Description:
-					fmt.Sprintf("SLOW SERVICE: %s responded in %dms (>2s). URL: http://%s:%d/. Check resource usage or network latency.",
-						name, ss.LatencyMs, ss.Host, port),
+				r.Issues = append(r.Issues, Issue{Description: fmt.Sprintf("SLOW SERVICE: %s responded in %dms (>2s). URL: http://%s:%d/. Check resource usage or network latency.",
+					name, ss.LatencyMs, ss.Host, port),
 				})
 			}
 			fmt.Printf("  %s %-15s %-12s %s%s\n", ui.Ok("✓"), name, ui.Dim(addr), speed, rtLabel)
@@ -98,9 +97,8 @@ func checkConnectivity(r *Result) {
 			}
 		} else if configured {
 			extra := tryDockerDiag(name, def.ContainerName, port)
-			r.Issues = append(r.Issues, Issue{Description:
-				fmt.Sprintf("UNREACHABLE: %s — tried %s. %s",
-					name, formatCandidates(name, port), extra.fixHint),
+			r.Issues = append(r.Issues, Issue{Description: fmt.Sprintf("UNREACHABLE: %s — tried %s. %s",
+				name, formatCandidates(name, port), extra.fixHint),
 			})
 			statusExtra := ""
 			if extra.short != "" {
@@ -232,9 +230,7 @@ func checkContainers(r *Result) {
 			r.ChecksPassed++
 			fmt.Printf("  %s %-15s %s %s\n", ui.Ok("✓"), cname, ui.Ok(status), ui.Dim(image))
 		} else {
-			r.Issues = append(r.Issues, Issue{Description:
-				fmt.Sprintf("CONTAINER DOWN: '%s' (image: %s) status: %s. Fix: docker start %s", cname, image, status, cname),
-			})
+			r.Issues = append(r.Issues, Issue{Description: fmt.Sprintf("CONTAINER DOWN: '%s' (image: %s) status: %s. Fix: docker start %s", cname, image, status, cname)})
 			fmt.Printf("  %s %-15s %s %s\n", ui.Err("✗"), cname, ui.Err(status), ui.Dim(image))
 		}
 	}
@@ -248,11 +244,10 @@ func checkDownloadClient(r *Result) {
 
 	// 1. Check qBittorrent reachability
 	if !api.CheckReachable("qbittorrent") {
-		r.Issues = append(r.Issues, Issue{Description:
-			fmt.Sprintf("QBITTORRENT UNREACHABLE at http://%s:%d/. "+
-				"Check that qBittorrent is running and WebUI is enabled. "+
-				"If WebUI binds to 127.0.0.1, change it to 0.0.0.0 in Options → Web UI → IP address.",
-				svc.Host, svc.Port),
+		r.Issues = append(r.Issues, Issue{Description: fmt.Sprintf("QBITTORRENT UNREACHABLE at http://%s:%d/. "+
+			"Check that qBittorrent is running and WebUI is enabled. "+
+			"If WebUI binds to 127.0.0.1, change it to 0.0.0.0 in Options → Web UI → IP address.",
+			svc.Host, svc.Port),
 		})
 		fmt.Printf("  %s qBittorrent at %s:%d — %s\n", ui.Err("✗"), svc.Host, svc.Port, ui.Err("unreachable"))
 
@@ -275,13 +270,13 @@ func checkDownloadClient(r *Result) {
 	// 3. Check preferences (bind address, save path)
 	prefs, err := qc.Preferences()
 	if err == nil {
-		if prefs.WebUIAddress == "*" || prefs.WebUIAddress == "0.0.0.0" || prefs.WebUIAddress == "" {
+		switch prefs.WebUIAddress {
+		case "*", "0.0.0.0", "":
 			r.ChecksPassed++
 			fmt.Printf("  %s WebUI bind: %s (accessible from network)\n", ui.Ok("✓"), prefs.WebUIAddress)
-		} else if prefs.WebUIAddress == "127.0.0.1" || prefs.WebUIAddress == "localhost" {
-			r.Issues = append(r.Issues, Issue{Description:
-				fmt.Sprintf("QBITTORRENT BIND ADDRESS: WebUI bound to %s — not accessible from other machines. "+
-					"Change to 0.0.0.0 in Options → Web UI → IP address.", prefs.WebUIAddress),
+		case "127.0.0.1", "localhost":
+			r.Issues = append(r.Issues, Issue{Description: fmt.Sprintf("QBITTORRENT BIND ADDRESS: WebUI bound to %s — not accessible from other machines. "+
+				"Change to 0.0.0.0 in Options → Web UI → IP address.", prefs.WebUIAddress),
 			})
 			fmt.Printf("  %s WebUI bind: %s %s\n", ui.Warn("!"), prefs.WebUIAddress, ui.Warn("(localhost only — other services may not reach it)"))
 		}
@@ -292,9 +287,7 @@ func checkDownloadClient(r *Result) {
 			r.ChecksPassed++
 			fmt.Printf("  %s Save path: %s\n", ui.Ok("✓"), prefs.SavePath)
 		} else {
-			r.Issues = append(r.Issues, Issue{Description:
-				"QBITTORRENT SAVE PATH: Not configured. Set in Options → Downloads → Default Save Path.",
-			})
+			r.Issues = append(r.Issues, Issue{Description: "QBITTORRENT SAVE PATH: Not configured. Set in Options → Downloads → Default Save Path."})
 			fmt.Printf("  %s Save path: %s\n", ui.Err("✗"), ui.Err("not set"))
 		}
 	}
@@ -337,18 +330,15 @@ func checkDownloadClient(r *Result) {
 					r.ChecksPassed++
 					fmt.Printf("  %s [%s] download client → %s:%s\n", ui.Ok("✓"), svcName, host, port)
 				} else {
-					r.Issues = append(r.Issues, Issue{Description:
-						fmt.Sprintf("DOWNLOAD CLIENT DISABLED: qBittorrent client in %s is disabled. Enable it in %s Settings → Download Clients.", svcName, svcName),
-					})
+					r.Issues = append(r.Issues, Issue{Description: fmt.Sprintf("DOWNLOAD CLIENT DISABLED: qBittorrent client in %s is disabled. Enable it in %s Settings → Download Clients.", svcName, svcName)})
 					fmt.Printf("  %s [%s] download client → %s:%s %s\n", ui.Err("✗"), svcName, host, port, ui.Err("disabled"))
 				}
 				break
 			}
 		}
 		if !found {
-			r.Issues = append(r.Issues, Issue{Description:
-				fmt.Sprintf("NO DOWNLOAD CLIENT: %s has no qBittorrent download client configured. Run admirarr setup or add manually in %s Settings → Download Clients.",
-					svcName, svcName),
+			r.Issues = append(r.Issues, Issue{Description: fmt.Sprintf("NO DOWNLOAD CLIENT: %s has no qBittorrent download client configured. Run admirarr setup or add manually in %s Settings → Download Clients.",
+				svcName, svcName),
 			})
 			fmt.Printf("  %s [%s] %s\n", ui.Err("✗"), svcName, ui.Err("no qBittorrent client configured"))
 		}
@@ -444,9 +434,7 @@ func checkDiskSpace(r *Result) {
 				label := fmt.Sprintf("[%s] %s", svcName, root.Path)
 				freeGB := float64(root.FreeSpace) / (1024 * 1024 * 1024)
 				if freeGB < 10 {
-					r.Issues = append(r.Issues, Issue{Description:
-						fmt.Sprintf("DISK LOW: %s has only %s free.", label, ui.FmtSize(root.FreeSpace)),
-					})
+					r.Issues = append(r.Issues, Issue{Description: fmt.Sprintf("DISK LOW: %s has only %s free.", label, ui.FmtSize(root.FreeSpace))})
 					fmt.Printf("  %s %s  %s free\n", ui.Warn("!"), label, ui.Warn(ui.FmtSize(root.FreeSpace)))
 				} else {
 					r.ChecksPassed++
@@ -484,14 +472,10 @@ func checkDiskSpace(r *Result) {
 func checkDiskPath(r *Result, label string, total, free int64) {
 	pctUsed := float64(total-free) / float64(total) * 100
 	if pctUsed > 95 {
-		r.Issues = append(r.Issues, Issue{Description:
-			fmt.Sprintf("DISK CRITICAL: %s is %.0f%% full, only %s free of %s.", label, pctUsed, ui.FmtSize(free), ui.FmtSize(total)),
-		})
+		r.Issues = append(r.Issues, Issue{Description: fmt.Sprintf("DISK CRITICAL: %s is %.0f%% full, only %s free of %s.", label, pctUsed, ui.FmtSize(free), ui.FmtSize(total))})
 		fmt.Printf("  %s %s  %s — %s free / %s\n", ui.Err("✗"), label, ui.Err(fmt.Sprintf("%.0f%% used", pctUsed)), ui.FmtSize(free), ui.FmtSize(total))
 	} else if pctUsed > 85 {
-		r.Issues = append(r.Issues, Issue{Description:
-			fmt.Sprintf("DISK LOW: %s is %.0f%% full, %s free of %s.", label, pctUsed, ui.FmtSize(free), ui.FmtSize(total)),
-		})
+		r.Issues = append(r.Issues, Issue{Description: fmt.Sprintf("DISK LOW: %s is %.0f%% full, %s free of %s.", label, pctUsed, ui.FmtSize(free), ui.FmtSize(total))})
 		fmt.Printf("  %s %s  %s — %s free / %s\n", ui.Warn("!"), label, ui.Warn(fmt.Sprintf("%.0f%% used", pctUsed)), ui.FmtSize(free), ui.FmtSize(total))
 	} else {
 		r.ChecksPassed++
@@ -537,9 +521,7 @@ func checkMediaPaths(r *Result) {
 		// 1. Get root folders from service
 		roots, err := client.RootFolders()
 		if err != nil || len(roots) == 0 {
-			r.Issues = append(r.Issues, Issue{Description:
-				fmt.Sprintf("NO ROOT FOLDER: %s has no root folders configured. Add one in %s Settings → Media Management.", item.svc, item.svc),
-			})
+			r.Issues = append(r.Issues, Issue{Description: fmt.Sprintf("NO ROOT FOLDER: %s has no root folders configured. Add one in %s Settings → Media Management.", item.svc, item.svc)})
 			fmt.Printf("  %s [%s] %s\n", ui.Err("✗"), item.svc, ui.Err("no root folder"))
 			continue
 		}
@@ -549,9 +531,7 @@ func checkMediaPaths(r *Result) {
 				fmt.Printf("  %s [%s] root folder: %s\n", ui.Ok("✓"), item.svc, root.Path)
 				r.ChecksPassed++
 			} else {
-				r.Issues = append(r.Issues, Issue{Description:
-					fmt.Sprintf("ROOT FOLDER INACCESSIBLE: %s root folder '%s' is not accessible. Check volume mounts or permissions.", item.svc, root.Path),
-				})
+				r.Issues = append(r.Issues, Issue{Description: fmt.Sprintf("ROOT FOLDER INACCESSIBLE: %s root folder '%s' is not accessible. Check volume mounts or permissions.", item.svc, root.Path)})
 				fmt.Printf("  %s [%s] root folder: %s %s\n", ui.Err("✗"), item.svc, root.Path, ui.Err("inaccessible"))
 			}
 		}
@@ -571,9 +551,7 @@ func checkMediaPaths(r *Result) {
 		}
 
 		if qbitDC == nil {
-			r.Issues = append(r.Issues, Issue{Description:
-				fmt.Sprintf("NO DOWNLOAD CLIENT: %s has no qBittorrent client. Add in Settings → Download Clients.", item.svc),
-			})
+			r.Issues = append(r.Issues, Issue{Description: fmt.Sprintf("NO DOWNLOAD CLIENT: %s has no qBittorrent client. Add in Settings → Download Clients.", item.svc)})
 			fmt.Printf("  %s [%s] %s\n", ui.Err("✗"), item.svc, ui.Err("no qBittorrent download client"))
 			continue
 		}
@@ -586,9 +564,7 @@ func checkMediaPaths(r *Result) {
 		}
 
 		if !qbitDC.Enable {
-			r.Issues = append(r.Issues, Issue{Description:
-				fmt.Sprintf("DOWNLOAD CLIENT DISABLED: %s qBittorrent client is disabled.", item.svc),
-			})
+			r.Issues = append(r.Issues, Issue{Description: fmt.Sprintf("DOWNLOAD CLIENT DISABLED: %s qBittorrent client is disabled.", item.svc)})
 			fmt.Printf("  %s [%s] download client: %s:%s %s\n", ui.Err("✗"), item.svc, dcHost, dcPort, ui.Err("disabled"))
 			continue
 		}
@@ -603,9 +579,7 @@ func checkMediaPaths(r *Result) {
 				fmt.Printf("  %s [%s] qBit category '%s' → %s\n", ui.Ok("✓"), item.svc, dcCategory, cat.SavePath)
 				r.ChecksPassed++
 			} else {
-				r.Issues = append(r.Issues, Issue{Description:
-					fmt.Sprintf("CATEGORY MISSING IN QBIT: %s expects category '%s' but it doesn't exist in qBittorrent. Run admirarr setup to create it.", item.svc, dcCategory),
-				})
+				r.Issues = append(r.Issues, Issue{Description: fmt.Sprintf("CATEGORY MISSING IN QBIT: %s expects category '%s' but it doesn't exist in qBittorrent. Run admirarr setup to create it.", item.svc, dcCategory)})
 				fmt.Printf("  %s [%s] qBit category '%s' %s\n", ui.Err("✗"), item.svc, dcCategory, ui.Err("not found in qBittorrent"))
 			}
 		}
@@ -712,9 +686,7 @@ func checkIndexers(r *Result) {
 		fmt.Printf("  %s %d indexer(s) healthy: %s\n", ui.Ok("✓"), len(healthy), strings.Join(healthy, ", "))
 	}
 	if len(failing) > 0 {
-		r.Issues = append(r.Issues, Issue{Description:
-			fmt.Sprintf("INDEXERS FAILING: %d indexer(s) failing: %s. Check Prowlarr.", len(failing), strings.Join(failing, ", ")),
-		})
+		r.Issues = append(r.Issues, Issue{Description: fmt.Sprintf("INDEXERS FAILING: %d indexer(s) failing: %s. Check Prowlarr.", len(failing), strings.Join(failing, ", "))})
 		fmt.Printf("  %s %d failing: %s\n", ui.Err("✗"), len(failing), strings.Join(failing, ", "))
 	}
 	if len(disabled) > 0 {
@@ -745,9 +717,8 @@ func checkServiceWarnings(r *Result) {
 				if item.WikiURL != "" {
 					fmt.Printf("         %s\n", ui.Dim(item.WikiURL))
 				}
-				r.Issues = append(r.Issues, Issue{Description:
-					fmt.Sprintf("HEALTH WARNING [%s] (%s): %s",
-						name, item.Type, item.Message),
+				r.Issues = append(r.Issues, Issue{Description: fmt.Sprintf("HEALTH WARNING [%s] (%s): %s",
+					name, item.Type, item.Message),
 				})
 			}
 		}
