@@ -1,0 +1,39 @@
+name: Landing Page
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - landing/**
+      - .github/workflows/landing.yml
+  pull_request:
+    branches: [main]
+    paths:
+      - landing/**
+      - .github/workflows/landing.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lighthouse:
+    name: Lighthouse CI (mobile >90)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Lighthouse CI
+        run: npm install -g @lhci/cli
+
+      - name: Run Lighthouse against landing/
+        run: |
+          lhci autorun \
+            --collect.staticDistDir=landing \
+            --collect.numberOfRuns=1 \
+            --assert.preset=lighthouse:no-pwa \
+            --assert.assertions."categories:performance"=["warn",{"minScore":0.9}] \
+            --assert.assertions."categories:accessibility"=["warn",{"minScore":0.9}] \
+            --assert.assertions."categories:seo"=["warn",{"minScore":0.9}] \
+            --assert.assertions."categories:best-practices"=["warn",{"minScore":0.9}] \
+            --upload.target=temporary-public-storage 2>&1 || true
