@@ -72,7 +72,7 @@ func Get(service, endpoint string, params map[string]string, timeout ...time.Dur
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 	return io.ReadAll(resp.Body)
 }
 
@@ -115,7 +115,7 @@ func Post(service, endpoint string, body interface{}, params map[string]string, 
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 	return io.ReadAll(resp.Body)
 }
 
@@ -158,7 +158,7 @@ func Put(service, endpoint string, body interface{}, params map[string]string, t
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 	return io.ReadAll(resp.Body)
 }
 
@@ -191,7 +191,7 @@ func Delete(service, endpoint string, params map[string]string, timeout ...time.
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 	return io.ReadAll(resp.Body)
 }
 
@@ -212,7 +212,7 @@ func CheckReachable(service string) bool {
 	if err != nil {
 		return false
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	return resp.StatusCode >= 200 && resp.StatusCode < 500
 }
 

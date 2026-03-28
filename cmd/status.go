@@ -457,7 +457,7 @@ func renderDashboard() {
 				if err != nil {
 					d.tautulliErr = true
 				} else {
-					defer resp.Body.Close()
+					defer resp.Body.Close() //nolint:errcheck
 					if err := json.NewDecoder(resp.Body).Decode(&activity); err != nil {
 						d.tautulliErr = true
 					} else {

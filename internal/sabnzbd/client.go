@@ -58,7 +58,7 @@ func (c *Client) Queue() (*QueueResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	var wrapper struct {
 		Queue QueueResponse `json:"queue"`
@@ -81,7 +81,7 @@ func (c *Client) Version() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	var result struct {
 		Version string `json:"version"`

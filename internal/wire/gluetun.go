@@ -107,7 +107,7 @@ func GetVPNStatus() VPNStatus {
 	if err != nil {
 		return VPNStatus{Err: fmt.Errorf("cannot reach Gluetun control server: %w", err)}
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	var status struct {
 		Status string `json:"status"`
@@ -122,7 +122,7 @@ func GetVPNStatus() VPNStatus {
 	var ip, country string
 	resp2, err := client.Get(gluetunURL + "/v1/publicip/ip")
 	if err == nil {
-		defer resp2.Body.Close()
+		defer resp2.Body.Close() //nolint:errcheck
 		var ipResp struct {
 			IP      string `json:"public_ip"`
 			Country string `json:"country"`

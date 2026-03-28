@@ -149,7 +149,7 @@ func TestPause(t *testing.T) {
 		if r.Method != "POST" {
 			t.Errorf("expected POST, got %s", r.Method)
 		}
-		r.ParseForm()
+		_ = r.ParseForm()
 		if r.FormValue("hashes") != "abc123|def456" {
 			t.Errorf("expected hashes=abc123|def456, got %s", r.FormValue("hashes"))
 		}
@@ -170,7 +170,7 @@ func TestResume(t *testing.T) {
 		if r.Method != "POST" {
 			t.Errorf("expected POST, got %s", r.Method)
 		}
-		r.ParseForm()
+		_ = r.ParseForm()
 		if r.FormValue("hashes") != "all" {
 			t.Errorf("expected hashes=all, got %s", r.FormValue("hashes"))
 		}
@@ -191,7 +191,7 @@ func TestDelete(t *testing.T) {
 		if r.Method != "POST" {
 			t.Errorf("expected POST, got %s", r.Method)
 		}
-		r.ParseForm()
+		_ = r.ParseForm()
 		if r.FormValue("hashes") != "abc123" {
 			t.Errorf("expected hashes=abc123, got %s", r.FormValue("hashes"))
 		}
@@ -212,7 +212,7 @@ func TestDelete(t *testing.T) {
 func TestDelete_NoFiles(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v2/torrents/delete", func(w http.ResponseWriter, r *http.Request) {
-		r.ParseForm()
+		_ = r.ParseForm()
 		if r.FormValue("deleteFiles") != "false" {
 			t.Errorf("expected deleteFiles=false, got %s", r.FormValue("deleteFiles"))
 		}

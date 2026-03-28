@@ -75,7 +75,7 @@ func (c *Client) CreateAccount() (*Account, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrNetworkError, err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if err := checkStatus(resp, http.StatusCreated); err != nil {
 		return nil, err
@@ -101,7 +101,7 @@ func (c *Client) GetToken(accountNumber string) (*AuthToken, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrNetworkError, err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if err := checkStatus(resp, http.StatusOK); err != nil {
 		return nil, err
@@ -128,7 +128,7 @@ func (c *Client) RegisterDevice(token, pubkey string) (*Device, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrNetworkError, err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode == http.StatusBadRequest {
 		// Mullvad returns 400 when max devices reached
@@ -163,7 +163,7 @@ func (c *Client) ListDevices(token string) ([]Device, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrNetworkError, err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if err := checkStatus(resp, http.StatusOK); err != nil {
 		return nil, err
@@ -188,7 +188,7 @@ func (c *Client) RemoveDevice(token, deviceID string) error {
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrNetworkError, err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if err := checkStatus(resp, http.StatusNoContent); err != nil {
 		return err
@@ -208,7 +208,7 @@ func (c *Client) GetAccountInfo(token string) (*Account, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrNetworkError, err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if err := checkStatus(resp, http.StatusOK); err != nil {
 		return nil, err

@@ -140,6 +140,6 @@ func checkRemoteService(remoteHost, service string, def config.ServiceDef) bool 
 	if err != nil {
 		return false
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	return resp.StatusCode >= 200 && resp.StatusCode < 500
 }
