@@ -11,10 +11,4 @@ linters:
   disable:
     # Pre-existing debt — being cleaned up incrementally. See NEO-417.
     - errcheck
-
-issues:
-  exclude-rules:
-    # Pre-existing QF1012 debt: WriteString(fmt.Sprintf(...)) → fmt.Fprintf.
-    # ~62 occurrences across the codebase. Tracked in NEO-417.
-    - linters: [staticcheck]
-      text: "QF1012"
+    - staticcheck
