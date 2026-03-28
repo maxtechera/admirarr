@@ -19,14 +19,14 @@ import (
 
 // seerrArrEntry represents a Seerr Radarr/Sonarr server config entry.
 type seerrArrEntry struct {
-	ID                int    `json:"id"`
-	Name              string `json:"name"`
-	Hostname          string `json:"hostname"`
-	Port              int    `json:"port"`
-	APIKey            string `json:"apiKey"`
-	IsDefault         bool   `json:"isDefault"`
-	ActiveProfileID   int    `json:"activeProfileId"`
-	ActiveDirectory   string `json:"activeDirectory"`
+	ID              int    `json:"id"`
+	Name            string `json:"name"`
+	Hostname        string `json:"hostname"`
+	Port            int    `json:"port"`
+	APIKey          string `json:"apiKey"`
+	IsDefault       bool   `json:"isDefault"`
+	ActiveProfileID int    `json:"activeProfileId"`
+	ActiveDirectory string `json:"activeDirectory"`
 }
 
 // WireSeerr runs Phase 8: connect Seerr to Radarr/Sonarr/media server.
@@ -109,17 +109,17 @@ func wireArrToSeerr(state *SetupState, r *StepResult, service string) {
 
 	// Build payload
 	payload := map[string]interface{}{
-		"name":              service,
-		"hostname":          hostname,
-		"port":              port,
-		"apiKey":            state.Keys[service],
-		"useSsl":            false,
-		"activeProfileId":   profiles[0].ID,
-		"activeDirectory":   roots[0].Path,
-		"is4k":              false,
-		"isDefault":         true,
-		"syncEnabled":       false,
-		"preventSearch":     false,
+		"name":            service,
+		"hostname":        hostname,
+		"port":            port,
+		"apiKey":          state.Keys[service],
+		"useSsl":          false,
+		"activeProfileId": profiles[0].ID,
+		"activeDirectory": roots[0].Path,
+		"is4k":            false,
+		"isDefault":       true,
+		"syncEnabled":     false,
+		"preventSearch":   false,
 	}
 
 	// Sonarr needs extra fields

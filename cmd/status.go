@@ -163,10 +163,10 @@ type statusIndexer struct {
 
 // arrLibraryLabel maps service names to human labels.
 var arrLibraryLabel = map[string]string{
-	"radarr":  "Movies",
-	"sonarr":  "TV Shows",
-	"lidarr":  "Music",
-	"readarr": "Books",
+	"radarr":   "Movies",
+	"sonarr":   "TV Shows",
+	"lidarr":   "Music",
+	"readarr":  "Books",
 	"whisparr": "Adult",
 }
 
@@ -992,19 +992,19 @@ func renderJSON(d *dashData, probed map[string]config.ServiceStatus) {
 		Indexers    []indexerJSON `json:"indexers"`
 	}
 	type statusOut struct {
-		Services     []serviceJSON               `json:"services"`
-		MediaServers []mediaServerJSON            `json:"media_servers,omitempty"`
-		Library      []arrLibJSON                 `json:"library"`
-		Subtitles    *subtitlesJSON               `json:"subtitles,omitempty"`
-		Streams      *int                         `json:"streams,omitempty"`
-		Health       []statusHealthItem           `json:"health"`
-		Indexers     *indexersSummaryJSON          `json:"indexers,omitempty"`
-		Requests     []requestJSON                `json:"requests"`
-		Queues       map[string][]queueItemJSON   `json:"queues"`
-		Torrents     []torrentJSON                `json:"torrents"`
-		Usenet       *usenetJSON                  `json:"usenet,omitempty"`
-		VPN          *vpnJSON                     `json:"vpn,omitempty"`
-		Disk         *diskJSON                    `json:"disk,omitempty"`
+		Services     []serviceJSON              `json:"services"`
+		MediaServers []mediaServerJSON          `json:"media_servers,omitempty"`
+		Library      []arrLibJSON               `json:"library"`
+		Subtitles    *subtitlesJSON             `json:"subtitles,omitempty"`
+		Streams      *int                       `json:"streams,omitempty"`
+		Health       []statusHealthItem         `json:"health"`
+		Indexers     *indexersSummaryJSON       `json:"indexers,omitempty"`
+		Requests     []requestJSON              `json:"requests"`
+		Queues       map[string][]queueItemJSON `json:"queues"`
+		Torrents     []torrentJSON              `json:"torrents"`
+		Usenet       *usenetJSON                `json:"usenet,omitempty"`
+		VPN          *vpnJSON                   `json:"vpn,omitempty"`
+		Disk         *diskJSON                  `json:"disk,omitempty"`
 	}
 
 	out := statusOut{

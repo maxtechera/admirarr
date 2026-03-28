@@ -12,7 +12,6 @@ import (
 	"github.com/maxtechera/admirarr/internal/ui"
 )
 
-
 // VerifyIndexers runs Phase 7: declarative indexer sync + Prowlarr wiring.
 // Reads config.Indexers and converges Prowlarr to match.
 func VerifyIndexers(state *SetupState) StepResult {
@@ -481,4 +480,3 @@ func selectRecommendedIndexers(state *SetupState) map[string]config.IndexerConfi
 	fmt.Printf("  %s Selected %d indexers\n", ui.Ok("✓"), len(result))
 	return result
 }
-

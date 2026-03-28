@@ -23,9 +23,7 @@ func checkNewServices(r *Result) {
 			r.ChecksPassed++
 			fmt.Printf("  %s Profilarr: %s\n", ui.Ok("✓"), ui.Ok("reachable"))
 		} else {
-			r.Issues = append(r.Issues, Issue{Description:
-				"PROFILARR UNREACHABLE: Profilarr is configured but not responding. Check container logs.",
-			})
+			r.Issues = append(r.Issues, Issue{Description: "PROFILARR UNREACHABLE: Profilarr is configured but not responding. Check container logs."})
 			fmt.Printf("  %s Profilarr: %s\n", ui.Err("✗"), ui.Err("unreachable"))
 		}
 	} else {
@@ -50,9 +48,7 @@ func checkWatchtower(r *Result) {
 		"--format", "{{.State.Status}}", container).Output()
 	if err != nil {
 		if config.IsConfigured("watchtower") {
-			r.Issues = append(r.Issues, Issue{Description:
-				fmt.Sprintf("WATCHTOWER: Container %q not found. Auto-updates are not running.", container),
-			})
+			r.Issues = append(r.Issues, Issue{Description: fmt.Sprintf("WATCHTOWER: Container %q not found. Auto-updates are not running.", container)})
 			fmt.Printf("  %s Watchtower: %s\n", ui.Err("✗"), ui.Err("container not found"))
 		} else {
 			fmt.Printf("  %s Watchtower: %s\n", ui.Dim("—"), ui.Dim("not configured"))
@@ -65,9 +61,7 @@ func checkWatchtower(r *Result) {
 		r.ChecksPassed++
 		fmt.Printf("  %s Watchtower: %s\n", ui.Ok("✓"), ui.Ok("running (auto-updates enabled)"))
 	} else {
-		r.Issues = append(r.Issues, Issue{Description:
-			fmt.Sprintf("WATCHTOWER: Container status=%s. Auto-updates are not active. Try: docker start %s", status, container),
-		})
+		r.Issues = append(r.Issues, Issue{Description: fmt.Sprintf("WATCHTOWER: Container status=%s. Auto-updates are not active. Try: docker start %s", status, container)})
 		fmt.Printf("  %s Watchtower: %s (%s)\n", ui.Err("✗"), ui.Err("not running"), status)
 	}
 }

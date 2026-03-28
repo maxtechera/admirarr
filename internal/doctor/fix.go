@@ -407,8 +407,8 @@ func fixVPNCredentials() bool {
 	// Write credentials to .env
 	creds := map[string]string{
 		"WIREGUARD_PRIVATE_KEY": privateKey,
-		"WIREGUARD_ADDRESSES":  device.IPv4Address,
-		"MULLVAD_ACCOUNT":      acct.Number,
+		"WIREGUARD_ADDRESSES":   device.IPv4Address,
+		"MULLVAD_ACCOUNT":       acct.Number,
 	}
 	opts := migrate.ComposeOpts{
 		VPNProvider: "mullvad",

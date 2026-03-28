@@ -15,7 +15,7 @@ import (
 // CheckVPNRoute verifies qBittorrent traffic routes through Gluetun.
 // Checks: 1) qBit container network_mode includes "gluetun"
 //
-//	2) Gluetun container is healthy
+//  2. Gluetun container is healthy
 func CheckVPNRoute() WireResult {
 	// Check if docker is available
 	if _, err := exec.LookPath("docker"); err != nil {

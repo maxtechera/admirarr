@@ -16,7 +16,7 @@ type SetupState struct {
 	Timezone         string
 	VPNProvider      string
 	VPNType          string
-	RemoteHost      string // Remote host IP for non-Docker services (auto-detected on WSL)
+	RemoteHost       string // Remote host IP for non-Docker services (auto-detected on WSL)
 	SelectedServices []string
 	Services         map[string]*ServiceState
 	Keys             map[string]string
@@ -79,10 +79,10 @@ type StepResult struct {
 	Errors  []string
 }
 
-func (r *StepResult) pass()                { r.Passed++ }
-func (r *StepResult) fix()                 { r.Fixed++ }
-func (r *StepResult) skip()                { r.Skipped++ }
-func (r *StepResult) err(msg string)       { r.Errors = append(r.Errors, msg) }
+func (r *StepResult) pass()          { r.Passed++ }
+func (r *StepResult) fix()           { r.Fixed++ }
+func (r *StepResult) skip()          { r.Skipped++ }
+func (r *StepResult) err(msg string) { r.Errors = append(r.Errors, msg) }
 func (r *StepResult) errf(f string, a ...interface{}) {
 	r.Errors = append(r.Errors, fmt.Sprintf(f, a...))
 }

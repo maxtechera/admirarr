@@ -231,11 +231,11 @@ func runRecyclarrVerify(cmd *cobra.Command, args []string) {
 
 	if ui.IsJSON() {
 		type verifyJSON struct {
-			Service         string `json:"service"`
-			QualityProfiles int    `json:"quality_profiles"`
-			CustomFormats   int    `json:"custom_formats"`
-			ProfilesOK     bool   `json:"profiles_applied"`
-			FormatsOK      bool   `json:"formats_applied"`
+			Service         string   `json:"service"`
+			QualityProfiles int      `json:"quality_profiles"`
+			CustomFormats   int      `json:"custom_formats"`
+			ProfilesOK      bool     `json:"profiles_applied"`
+			FormatsOK       bool     `json:"formats_applied"`
 			Issues          []string `json:"issues"`
 		}
 		var out []verifyJSON

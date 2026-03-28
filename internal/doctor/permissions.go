@@ -78,10 +78,9 @@ func checkPermissions(r *Result) {
 			fmt.Printf("  %s PUID/PGID consistent: PUID=%s PGID=%s across %d services\n",
 				ui.Ok("✓"), ref.puid, ref.pgid, len(envs))
 		} else {
-			r.Issues = append(r.Issues, Issue{Description:
-				fmt.Sprintf("PUID/PGID MISMATCH: %s has PUID=%s PGID=%s but %s differ. "+
-					"All containers should use the same PUID/PGID for proper file permissions.",
-					ref.name, ref.puid, ref.pgid, strings.Join(mismatches, ", ")),
+			r.Issues = append(r.Issues, Issue{Description: fmt.Sprintf("PUID/PGID MISMATCH: %s has PUID=%s PGID=%s but %s differ. "+
+				"All containers should use the same PUID/PGID for proper file permissions.",
+				ref.name, ref.puid, ref.pgid, strings.Join(mismatches, ", ")),
 			})
 			fmt.Printf("  %s PUID/PGID mismatch: %s=%s/%s vs %s\n",
 				ui.Err("✗"), ref.name, ref.puid, ref.pgid, strings.Join(mismatches, ", "))

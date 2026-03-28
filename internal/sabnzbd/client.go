@@ -26,11 +26,11 @@ func New() *Client {
 
 // QueueSlot represents a single download in the SABnzbd queue.
 type QueueSlot struct {
-	Filename   string `json:"filename"`
-	Status     string `json:"status"`
-	Percentage string `json:"percentage"`
-	SizeLeft   string `json:"sizeleft"`
-	Size       string `json:"size"`
+	Filename   string  `json:"filename"`
+	Status     string  `json:"status"`
+	Percentage string  `json:"percentage"`
+	SizeLeft   string  `json:"sizeleft"`
+	Size       string  `json:"size"`
 	MBLeft     float64 `json:"mbleft"`
 	MB         float64 `json:"mb"`
 }

@@ -138,5 +138,3 @@ func Service(service string) Result {
 
 	return Result{Error: fmt.Errorf("container %s did not start within 30s", container)}
 }
-
-

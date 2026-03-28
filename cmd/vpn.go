@@ -274,8 +274,8 @@ func runVPNRotate(cmd *cobra.Command, args []string) {
 
 	creds := map[string]string{
 		"WIREGUARD_PRIVATE_KEY": privateKey,
-		"WIREGUARD_ADDRESSES":  device.IPv4Address,
-		"MULLVAD_ACCOUNT":      account,
+		"WIREGUARD_ADDRESSES":   device.IPv4Address,
+		"MULLVAD_ACCOUNT":       account,
 	}
 	opts := migrate.ComposeOpts{
 		VPNProvider: "mullvad",

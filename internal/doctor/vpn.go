@@ -42,9 +42,7 @@ func checkVPN(r *Result) {
 			r.ChecksPassed++
 			fmt.Printf("  %s Gluetun container: %s\n", ui.Ok("✓"), ui.Ok("healthy"))
 		} else {
-			r.Issues = append(r.Issues, Issue{Description:
-				fmt.Sprintf("GLUETUN UNHEALTHY: container health=%s. Check Gluetun logs: docker logs --tail 30 %s", health, gluetunContainer),
-			})
+			r.Issues = append(r.Issues, Issue{Description: fmt.Sprintf("GLUETUN UNHEALTHY: container health=%s. Check Gluetun logs: docker logs --tail 30 %s", health, gluetunContainer)})
 			fmt.Printf("  %s Gluetun container: %s\n", ui.Err("✗"), ui.Err(health))
 		}
 	}
@@ -64,9 +62,7 @@ func checkVPN(r *Result) {
 		}
 		fmt.Printf("  %s VPN: %s\n", ui.Ok("✓"), detail)
 	} else {
-		r.Issues = append(r.Issues, Issue{Description:
-			"VPN DISCONNECTED: Gluetun reports VPN is not running. Check VPN credentials and provider configuration.",
-		})
+		r.Issues = append(r.Issues, Issue{Description: "VPN DISCONNECTED: Gluetun reports VPN is not running. Check VPN credentials and provider configuration."})
 		fmt.Printf("  %s VPN: %s\n", ui.Err("✗"), ui.Err("disconnected"))
 	}
 
@@ -79,9 +75,7 @@ func checkVPN(r *Result) {
 	case "skipped":
 		fmt.Printf("  %s qBittorrent VPN routing: %s\n", ui.Dim("—"), ui.Dim(routeResult.Detail))
 	case "failed":
-		r.Issues = append(r.Issues, Issue{Description:
-			fmt.Sprintf("VPN ROUTING: %s", routeResult.Detail),
-		})
+		r.Issues = append(r.Issues, Issue{Description: fmt.Sprintf("VPN ROUTING: %s", routeResult.Detail)})
 		fmt.Printf("  %s qBittorrent VPN routing: %s\n", ui.Err("✗"), ui.Err(routeResult.Detail))
 	}
 
@@ -105,9 +99,7 @@ func checkVPN(r *Result) {
 			}
 		}
 		if !hasProvider {
-			r.Issues = append(r.Issues, Issue{Description:
-				"VPN PROVIDER: VPN_SERVICE_PROVIDER not set on Gluetun container.",
-			})
+			r.Issues = append(r.Issues, Issue{Description: "VPN PROVIDER: VPN_SERVICE_PROVIDER not set on Gluetun container."})
 			fmt.Printf("  %s VPN provider: %s\n", ui.Err("✗"), ui.Err("not configured"))
 		}
 	}
@@ -153,15 +145,13 @@ func checkMullvadAccount(r *Result, account string) {
 	} else {
 		remaining := time.Until(acct.ExpiresAt)
 		if remaining <= 0 {
-			r.Issues = append(r.Issues, Issue{Description:
-				fmt.Sprintf("MULLVAD EXPIRED: Account %s expired on %s. Add payment at https://mullvad.net/account/login",
-					vpn.FormatAccountNumber(account), acct.ExpiresAt.Format("2006-01-02")),
+			r.Issues = append(r.Issues, Issue{Description: fmt.Sprintf("MULLVAD EXPIRED: Account %s expired on %s. Add payment at https://mullvad.net/account/login",
+				vpn.FormatAccountNumber(account), acct.ExpiresAt.Format("2006-01-02")),
 			})
 			fmt.Printf("  %s Mullvad account: %s\n", ui.Err("✗"), ui.Err(fmt.Sprintf("expired (%s)", acct.ExpiresAt.Format("2006-01-02"))))
 		} else if remaining < 7*24*time.Hour {
-			r.Issues = append(r.Issues, Issue{Description:
-				fmt.Sprintf("MULLVAD EXPIRING: Account expires in %d days (%s). Add payment at https://mullvad.net/account/login",
-					int(remaining.Hours()/24), acct.ExpiresAt.Format("2006-01-02")),
+			r.Issues = append(r.Issues, Issue{Description: fmt.Sprintf("MULLVAD EXPIRING: Account expires in %d days (%s). Add payment at https://mullvad.net/account/login",
+				int(remaining.Hours()/24), acct.ExpiresAt.Format("2006-01-02")),
 			})
 			fmt.Printf("  %s Mullvad account: %s\n", ui.Warn("!"), ui.Warn(fmt.Sprintf("expires in %d days", int(remaining.Hours()/24))))
 		} else {
@@ -197,9 +187,7 @@ func checkMullvadAccount(r *Result, account string) {
 	// We can't easily derive the public key here without importing curve25519,
 	// but we can check if we have any registered devices at all
 	if len(devices) == 0 {
-		r.Issues = append(r.Issues, Issue{Description:
-			"MULLVAD DEVICE: No devices registered. Run 'admirarr vpn setup' or 'admirarr vpn rotate' to register a device.",
-		})
+		r.Issues = append(r.Issues, Issue{Description: "MULLVAD DEVICE: No devices registered. Run 'admirarr vpn setup' or 'admirarr vpn rotate' to register a device."})
 		fmt.Printf("  %s Mullvad devices: %s\n", ui.Err("✗"), ui.Err("no devices registered"))
 	} else {
 		r.ChecksPassed++
