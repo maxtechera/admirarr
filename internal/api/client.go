@@ -13,8 +13,6 @@ import (
 	"github.com/maxtechera/admirarr/internal/keys"
 )
 
-var client = &http.Client{Timeout: 5 * time.Second}
-
 // Client is a service-bound API client that avoids repeating the service name.
 type Client struct {
 	Service string

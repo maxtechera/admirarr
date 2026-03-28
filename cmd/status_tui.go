@@ -488,12 +488,10 @@ func (m tuiModel) View() string {
 	var b strings.Builder
 
 	// Header
-	spinner := "●"
+	spinner := ui.Ok("●")
 	if m.loading {
 		frames := []string{"◐", "◓", "◑", "◒"}
 		spinner = ui.GoldText(frames[m.tick%4])
-	} else {
-		spinner = ui.Ok("●")
 	}
 	ts := m.lastUpdate.Format("15:04:05")
 	if m.lastUpdate.IsZero() {

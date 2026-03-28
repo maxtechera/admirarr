@@ -89,7 +89,7 @@ func (p *PlexServer) LibraryScan() ([]ScanResult, error) {
 func (p *PlexServer) WatchHistory(limit int) ([]WatchEntry, error) {
 	key := keys.Get("tautulli")
 	if key == "" || !api.CheckReachable("tautulli") {
-		return nil, fmt.Errorf("Tautulli is required for Plex watch history but is not available")
+		return nil, fmt.Errorf("tautulli is required for Plex watch history but is not available")
 	}
 	return tautulliHistory(key, limit)
 }
