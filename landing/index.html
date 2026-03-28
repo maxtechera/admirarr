@@ -19,6 +19,7 @@
   <meta name="twitter:image" content="https://admirarr.dev/og.png">
 
   <!-- Favicon -->
+    <link rel="preload" href="logo-dark.svg" as="image" type="image/svg+xml">
   <link rel="icon" type="image/svg+xml" href="icon.svg">
 
   <style>
@@ -239,7 +240,7 @@
       margin-bottom: 2rem;
     }
 
-    .install-note a { color: var(--gold); text-decoration: none; }
+    .install-note a { color: var(--gold); text-decoration: underline; text-underline-offset: 3px; }
     a:focus { outline: 2px solid var(--gold); outline-offset: 2px; }
 
     .hero-btns {
@@ -595,9 +596,10 @@
       margin-bottom: 1.5rem;
     }
 
-    .footer-links a { text-decoration: underline; text-underline-offset: 3px; } .footer-links a {
+    .footer-links a {
       color: var(--text-muted);
-      text-decoration: none;
+      text-decoration: underline;
+      text-underline-offset: 3px;
       font-size: 0.875rem;
       transition: color 0.2s;
     }
@@ -671,7 +673,7 @@
 <!-- ── HERO ── -->
 <section class="hero">
   <div class="hero-badge">⚓ v1.0 · MIT License</div>
-  <img class="hero-logo" src="logo-dark.svg" alt="Admirarr logo">
+  <img class="hero-logo" src="logo-dark.svg" alt="Admirarr logo" width="200" height="40">
   <h1>Command your <span class="accent">*Arr fleet</span><br>from one terminal</h1>
   <p class="hero-sub">
     Deploy, wire, operate, and diagnose your Jellyfin/Plex + *Arr stack from one terminal.
@@ -1057,7 +1059,7 @@
       <a href="https://agentskills.io">Agent Skills</a>
       <a href="https://github.com/maxtechera/admirarr/blob/master/LICENSE">MIT License</a>
     </div>
-    <p class="footer-copy">Built with ⚓ by <a href="https://github.com/maxtechera" style="color:var(--gold); text-decoration:none;">maxtechera</a></p>
+    <p class="footer-copy">Built with ⚓ by <a href="https://github.com/maxtechera" style="color:var(--gold); text-decoration:underline; text-underline-offset:3px;">maxtechera</a></p>
   </div>
 </footer>
 
