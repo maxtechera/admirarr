@@ -9,3 +9,4 @@ linters:
     - govet         # lostcancel + shadow issues pre-existing
     - ineffassign   # pre-existing ineffectual assignments
     - staticcheck   # pre-existing QF + ST issues
+    - unused        # pre-existing unused vars/funcs in test helpers
