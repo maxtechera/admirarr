@@ -23,6 +23,16 @@
 
 <br>
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/demo-dark.gif">
+    <source media="(prefers-color-scheme: light)" srcset="assets/demo-light.gif">
+    <img alt="Admirarr demo — setup, status, doctor, search" src="assets/demo-dark.gif" width="700">
+  </picture>
+</p>
+
+<br>
+
 ## What is Admirarr?
 
 Deploy, wire, operate, and diagnose your Jellyfin/Plex + *Arr stack from one terminal. One binary, 26 commands, JSON output everywhere. Ships with a [`SKILL.md`](https://agentskills.io) following the Agent Skills open standard — so any AI agent on any platform can command your fleet too.
