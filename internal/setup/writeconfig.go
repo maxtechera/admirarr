@@ -166,7 +166,7 @@ func buildYAML(state *SetupState) string {
 	if qp == "" {
 		qp = "HD-1080p"
 	}
-	b.WriteString(fmt.Sprintf("\n# ─── Quality ──────────────────────────────────────────────────────────\n"))
+	b.WriteString("\n# ─── Quality ──────────────────────────────────────────────────────────\n")
 	b.WriteString(fmt.Sprintf("quality_profile: \"%s\"\n", qp))
 
 	// Indexers — prefer state.Indexers (from setup) over config

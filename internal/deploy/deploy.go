@@ -34,25 +34,26 @@ func Service(service string) Result {
 
 	// Check Docker is available
 	if err := exec.Command("docker", "version").Run(); err != nil {
-		return Result{Error: fmt.Errorf("Docker not available: %v", err)}
+		return Result{Error: fmt.Errorf("docker not available: %v", err)}
 	}
 
 	// Check if container already exists
-	out, err := exec.CommandContext(
-		contextTimeout(10*time.Second),
-		"docker", "inspect", "-f", "{{.State.Status}}", container,
-	).Output()
-	if err == nil {
-		state := strings.TrimSpace(string(out))
-		if state == "running" {
-			return Result{Deployed: true, Container: container}
-		}
-		// Container exists but not running — start it
-		if state != "" {
-			if err := exec.Command("docker", "start", container).Run(); err != nil {
-				return Result{Error: fmt.Errorf("container exists but failed to start: %v", err)}
+	{
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		out, err := exec.CommandContext(ctx, "docker", "inspect", "-f", "{{.State.Status}}", container).Output()
+		cancel()
+		if err == nil {
+			state := strings.TrimSpace(string(out))
+			if state == "running" {
+				return Result{Deployed: true, Container: container}
 			}
-			return Result{Deployed: true, Container: container}
+			// Container exists but not running — start it
+			if state != "" {
+				if err := exec.Command("docker", "start", container).Run(); err != nil {
+					return Result{Error: fmt.Errorf("container exists but failed to start: %v", err)}
+				}
+				return Result{Deployed: true, Container: container}
+			}
 		}
 	}
 
@@ -107,20 +108,18 @@ func Service(service string) Result {
 	defer os.Remove(tmpCompose)
 
 	// Docker compose up
-	cmd := exec.CommandContext(
-		contextTimeout(2*time.Minute),
-		"docker", "compose", "-f", tmpCompose, "up", "-d",
-	)
+	ctx1, cancel1 := context.WithTimeout(context.Background(), 2*time.Minute)
+	cmd := exec.CommandContext(ctx1, "docker", "compose", "-f", tmpCompose, "up", "-d")
 	cmd.Dir = composeDir
-	out, err = cmd.CombinedOutput()
+	out, err := cmd.CombinedOutput()
+	cancel1()
 	if err != nil {
 		// Try V1
-		cmd2 := exec.CommandContext(
-			contextTimeout(2*time.Minute),
-			"docker-compose", "-f", tmpCompose, "up", "-d",
-		)
+		ctx2, cancel2 := context.WithTimeout(context.Background(), 2*time.Minute)
+		cmd2 := exec.CommandContext(ctx2, "docker-compose", "-f", tmpCompose, "up", "-d")
 		cmd2.Dir = composeDir
 		out2, err2 := cmd2.CombinedOutput()
+		cancel2()
 		if err2 != nil {
 			return Result{Error: fmt.Errorf("docker compose up failed: %s\n%s",
 				strings.TrimSpace(string(out)), strings.TrimSpace(string(out2)))}
@@ -140,7 +139,4 @@ func Service(service string) Result {
 	return Result{Error: fmt.Errorf("container %s did not start within 30s", container)}
 }
 
-func contextTimeout(d time.Duration) context.Context {
-	ctx, _ := context.WithTimeout(context.Background(), d)
-	return ctx
-}
+

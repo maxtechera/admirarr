@@ -275,10 +275,11 @@ func checkDownloadClient(r *Result) {
 	// 3. Check preferences (bind address, save path)
 	prefs, err := qc.Preferences()
 	if err == nil {
-		if prefs.WebUIAddress == "*" || prefs.WebUIAddress == "0.0.0.0" || prefs.WebUIAddress == "" {
+		switch prefs.WebUIAddress {
+		case "*", "0.0.0.0", "":
 			r.ChecksPassed++
 			fmt.Printf("  %s WebUI bind: %s (accessible from network)\n", ui.Ok("✓"), prefs.WebUIAddress)
-		} else if prefs.WebUIAddress == "127.0.0.1" || prefs.WebUIAddress == "localhost" {
+		case "127.0.0.1", "localhost":
 			r.Issues = append(r.Issues, Issue{Description:
 				fmt.Sprintf("QBITTORRENT BIND ADDRESS: WebUI bound to %s — not accessible from other machines. "+
 					"Change to 0.0.0.0 in Options → Web UI → IP address.", prefs.WebUIAddress),

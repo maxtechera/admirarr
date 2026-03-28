@@ -37,7 +37,7 @@ func VerifyIndexers(state *SetupState) StepResult {
 
 	// If no indexers in config, auto-populate from recommended list
 	// But skip if Prowlarr already has indexers configured (partial stack)
-	if len(desired) == 0 && (state.Indexers == nil || len(state.Indexers) == 0) {
+	if len(desired) == 0 && len(state.Indexers) == 0 {
 		if fetchErr == nil && len(existing) > 0 {
 			fmt.Printf("  %s Prowlarr already has %d indexer(s), skipping auto-select\n", ui.Ok("✓"), len(existing))
 		} else {

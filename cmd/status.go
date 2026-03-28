@@ -730,9 +730,10 @@ func renderDashboard() {
 			}
 			for _, rec := range q.Records {
 				colorFn := ui.Err
-				if rec.TrackedDownloadState == "downloading" {
+				switch rec.TrackedDownloadState {
+				case "downloading":
 					colorFn = ui.Ok
-				} else if rec.TrackedDownloadState == "importPending" {
+				case "importPending":
 					colorFn = ui.Warn
 				}
 				title := rec.Title

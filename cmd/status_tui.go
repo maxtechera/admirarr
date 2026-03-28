@@ -488,7 +488,7 @@ func (m tuiModel) View() string {
 	var b strings.Builder
 
 	// Header
-	spinner := "●"
+	var spinner string
 	if m.loading {
 		frames := []string{"◐", "◓", "◑", "◒"}
 		spinner = ui.GoldText(frames[m.tick%4])
@@ -500,13 +500,13 @@ func (m tuiModel) View() string {
 		ts = "loading…"
 	}
 
-	b.WriteString(fmt.Sprintf("\n  %s %s %s    %s  %s  %s\n",
+	fmt.Fprintf(&b, "\n  %s %s %s    %s  %s  %s\n",
 		ui.GoldText("⚓"), ui.Bold("ADMIRARR"), ui.Dim("v"+ui.Version),
-		ui.Dim("Command your fleet."), ui.Dim(ts), spinner))
+		ui.Dim("Command your fleet."), ui.Dim(ts), spinner)
 	b.WriteString(ui.Separator() + "\n")
 
 	// Fleet
-	b.WriteString(fmt.Sprintf("\n  %s\n", ui.Bold("Fleet")))
+	fmt.Fprintf(&b, "\n  %s\n", ui.Bold("Fleet"))
 	names := config.AllServiceNames()
 	var displayNames []string
 	for _, n := range names {
@@ -521,7 +521,7 @@ func (m tuiModel) View() string {
 		if i+1 < len(displayNames) {
 			right = renderServiceCell(m.services, displayNames[i+1])
 		}
-		b.WriteString(fmt.Sprintf("  %-38s%s\n", left, right))
+		fmt.Fprintf(&b, "  %-38s%s\n", left, right)
 	}
 
 	// Indexers
@@ -693,9 +693,10 @@ func (m tuiModel) View() string {
 			}
 			for _, rec := range q.Records {
 				colorFn := ui.Err
-				if rec.TrackedDownloadState == "downloading" {
+				switch rec.TrackedDownloadState {
+				case "downloading":
 					colorFn = ui.Ok
-				} else if rec.TrackedDownloadState == "importPending" {
+				case "importPending":
 					colorFn = ui.Warn
 				}
 				title := rec.Title

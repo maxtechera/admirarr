@@ -80,9 +80,10 @@ func runQueue(cmd *cobra.Command, args []string) {
 				for _, rec := range sd.page.Records {
 					state := rec.TrackedDownloadState
 					colorFn := ui.Err
-					if state == "downloading" {
+					switch state {
+					case "downloading":
 						colorFn = ui.Ok
-					} else if state == "importPending" {
+					case "importPending":
 						colorFn = ui.Warn
 					}
 					title := rec.Title
