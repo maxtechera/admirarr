@@ -1,12 +1,9 @@
 version: "2"
 
 linters:
-  default: standard
-  disable:
-    # Pre-existing issues across the codebase — tracked separately from CI gate.
-    # These were hidden by the broken golangci-lint v1 config (Go 1.24 mismatch).
-    - errcheck      # widespread unchecked errors in test helpers + CLI code
-    - govet         # lostcancel + shadow issues pre-existing
-    - ineffassign   # pre-existing ineffectual assignments
-    - staticcheck   # pre-existing QF + ST issues
-    - unused        # pre-existing unused vars/funcs in test helpers
+  # Start with no linters and only enable what we know works cleanly.
+  # Pre-existing lint debt across the codebase is tracked separately.
+  default: none
+  enable:
+    - gofmt
+    - misspell
