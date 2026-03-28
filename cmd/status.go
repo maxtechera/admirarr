@@ -461,7 +461,7 @@ func renderDashboard() {
 					if err := json.NewDecoder(resp.Body).Decode(&activity); err != nil {
 						d.tautulliErr = true
 					} else {
-						fmt.Sscanf(activity.Response.Data.StreamCount, "%d", &d.tautulliStreams)
+						_, _ = fmt.Sscanf(activity.Response.Data.StreamCount, "%d", &d.tautulliStreams)
 					}
 				}
 			}

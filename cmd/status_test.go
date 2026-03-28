@@ -23,7 +23,7 @@ func setupMockService(t *testing.T, service string, ts *httptest.Server) {
 	addr := strings.TrimPrefix(ts.URL, "http://")
 	parts := strings.SplitN(addr, ":", 2)
 	var port int
-	fmt.Sscanf(parts[1], "%d", &port)
+	_, _ = fmt.Sscanf(parts[1], "%d", &port)
 
 	viper.Set("services."+service+".host", parts[0])
 	viper.Set("services."+service+".port", port)
@@ -260,7 +260,7 @@ func TestDashData_IndexerFetch(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v1/indexer", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]statusIndexer{
+		_ = json.NewEncoder(w).Encode([]statusIndexer{
 			{Name: "1337x", Enable: true},
 			{Name: "YTS", Enable: true},
 			{Name: "EZTV", Enable: false},
@@ -268,7 +268,7 @@ func TestDashData_IndexerFetch(t *testing.T) {
 	})
 	mux.HandleFunc("/api/v1/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`[]`))
+		_, _ = w.Write([]byte(`[]`))
 	})
 	ts := httptest.NewServer(mux)
 	defer ts.Close()

@@ -43,7 +43,7 @@ func injectService(t *testing.T, name, rawURL, apiVer string) {
 	addr := strings.TrimPrefix(rawURL, "http://")
 	parts := strings.SplitN(addr, ":", 2)
 	var port int
-	fmt.Sscanf(parts[1], "%d", &port)
+	_, _ = fmt.Sscanf(parts[1], "%d", &port)
 	viper.Set("services."+name+".host", parts[0])
 	viper.Set("services."+name+".port", port)
 	viper.Set("services."+name+".api_ver", apiVer)
@@ -55,7 +55,7 @@ func injectService(t *testing.T, name, rawURL, apiVer string) {
 func TestMovies(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v3/movie", func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode([]Movie{
+		_ = json.NewEncoder(w).Encode([]Movie{
 			{ID: 1, Title: "Inception", Year: 2010, HasFile: true, SizeOnDisk: 5_000_000_000},
 			{ID: 2, Title: "The Matrix", Year: 1999, HasFile: false, Monitored: true},
 		})
@@ -85,7 +85,7 @@ func TestLookupMovie(t *testing.T) {
 		if r.URL.Query().Get("term") != "inception" {
 			t.Errorf("expected term=inception, got %s", r.URL.Query().Get("term"))
 		}
-		json.NewEncoder(w).Encode([]map[string]interface{}{
+		_ = json.NewEncoder(w).Encode([]map[string]interface{}{
 			{"title": "Inception", "year": 2010},
 		})
 	})
@@ -113,11 +113,11 @@ func TestAddMovie(t *testing.T) {
 		}
 		body, _ := io.ReadAll(r.Body)
 		var payload map[string]interface{}
-		json.Unmarshal(body, &payload)
+		_ = json.Unmarshal(body, &payload)
 		if payload["title"] != "Inception" {
 			t.Errorf("expected title=Inception, got %v", payload["title"])
 		}
-		w.Write([]byte(`{"id":42}`))
+		_, _ = w.Write([]byte(`{"id":42}`))
 	})
 
 	ts, client := setupRadarr(t, mux)
@@ -138,7 +138,7 @@ func TestReleases(t *testing.T) {
 		if r.URL.Query().Get("movieId") != "5" {
 			t.Errorf("expected movieId=5, got %s", r.URL.Query().Get("movieId"))
 		}
-		json.NewEncoder(w).Encode([]Release{
+		_ = json.NewEncoder(w).Encode([]Release{
 			{Title: "Inception.2010.1080p", Size: 2_000_000_000, Seeders: 50},
 		})
 	})
@@ -160,7 +160,7 @@ func TestReleases(t *testing.T) {
 func TestSeries(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v3/series", func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode([]Series{
+		_ = json.NewEncoder(w).Encode([]Series{
 			{ID: 1, Title: "Breaking Bad", Year: 2008, Statistics: SeriesStats{EpisodeCount: 62, EpisodeFileCount: 62, SizeOnDisk: 100_000_000_000}},
 			{ID: 2, Title: "The Wire", Year: 2002, Monitored: true},
 		})
@@ -190,7 +190,7 @@ func TestWantedMissing(t *testing.T) {
 		if r.URL.Query().Get("sortKey") != "airDateUtc" {
 			t.Errorf("expected sortKey=airDateUtc, got %s", r.URL.Query().Get("sortKey"))
 		}
-		json.NewEncoder(w).Encode(WantedMissingPage{
+		_ = json.NewEncoder(w).Encode(WantedMissingPage{
 			TotalRecords: 1,
 			Records: []MissingEpisode{
 				{Title: "Pilot", SeasonNumber: 1, EpisodeNumber: 1, Series: struct {
@@ -223,7 +223,7 @@ func TestQueue(t *testing.T) {
 		if r.URL.Query().Get("pageSize") != "50" {
 			t.Errorf("expected pageSize=50, got %s", r.URL.Query().Get("pageSize"))
 		}
-		json.NewEncoder(w).Encode(QueuePage{
+		_ = json.NewEncoder(w).Encode(QueuePage{
 			TotalRecords: 2,
 			Records: []QueueRecord{
 				{Title: "Inception", TrackedDownloadState: "importPending", Size: 2000, Sizeleft: 500},
@@ -250,7 +250,7 @@ func TestQueue(t *testing.T) {
 func TestHealth(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v3/health", func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode([]HealthItem{
+		_ = json.NewEncoder(w).Encode([]HealthItem{
 			{Type: "warning", Message: "No root folders configured", Source: "RootFolderCheck"},
 		})
 	})
@@ -270,7 +270,7 @@ func TestHealth(t *testing.T) {
 func TestRootFolders(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v3/rootfolder", func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode([]RootFolder{
+		_ = json.NewEncoder(w).Encode([]RootFolder{
 			{ID: 1, Path: "/data/media/movies", Accessible: true, FreeSpace: 500_000_000_000},
 		})
 	})
@@ -295,11 +295,11 @@ func TestAddRootFolder(t *testing.T) {
 		}
 		body, _ := io.ReadAll(r.Body)
 		var payload map[string]string
-		json.Unmarshal(body, &payload)
+		_ = json.Unmarshal(body, &payload)
 		if payload["path"] != "/data/media/movies" {
 			t.Errorf("expected path=/data/media/movies, got %s", payload["path"])
 		}
-		w.Write([]byte(`{"id":1}`))
+		_, _ = w.Write([]byte(`{"id":1}`))
 	})
 
 	ts, client := setupRadarr(t, mux)
@@ -313,7 +313,7 @@ func TestAddRootFolder(t *testing.T) {
 func TestQualityProfiles(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v3/qualityprofile", func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode([]QualityProfile{
+		_ = json.NewEncoder(w).Encode([]QualityProfile{
 			{ID: 1, Name: "HD-1080p"},
 			{ID: 2, Name: "Ultra-HD"},
 		})
@@ -334,7 +334,7 @@ func TestQualityProfiles(t *testing.T) {
 func TestCommands(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v3/command", func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode([]Command{
+		_ = json.NewEncoder(w).Encode([]Command{
 			{Name: "RefreshMovie", Status: "started"},
 		})
 	})
@@ -362,7 +362,7 @@ func TestSearch(t *testing.T) {
 		if r.URL.Query().Get("type") != "search" {
 			t.Errorf("expected type=search, got %s", r.URL.Query().Get("type"))
 		}
-		json.NewEncoder(w).Encode([]SearchResult{
+		_ = json.NewEncoder(w).Encode([]SearchResult{
 			{Title: "Inception.2010.1080p", Size: 2_000_000_000, Seeders: 100, Indexer: "1337x"},
 		})
 	})
@@ -382,7 +382,7 @@ func TestSearch(t *testing.T) {
 func TestIndexers(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v1/indexer", func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode([]Indexer{
+		_ = json.NewEncoder(w).Encode([]Indexer{
 			{ID: 1, Name: "1337x", Enable: true, Protocol: "torrent"},
 			{ID: 2, Name: "NZBgeek", Enable: false, Protocol: "usenet"},
 		})
@@ -406,7 +406,7 @@ func TestIndexers(t *testing.T) {
 func TestIndexerStatuses(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v1/indexerstatus", func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode([]IndexerStatus{
+		_ = json.NewEncoder(w).Encode([]IndexerStatus{
 			{IndexerID: 1, MostRecentFailure: "2026-01-01T00:00:00Z", DisabledTill: "2026-01-01T01:00:00Z"},
 		})
 	})
@@ -429,7 +429,7 @@ func TestAddIndexer(t *testing.T) {
 		if r.Method != "POST" {
 			t.Errorf("expected POST, got %s", r.Method)
 		}
-		w.Write([]byte(`{"id":10,"name":"NewIndexer","enable":true}`))
+		_, _ = w.Write([]byte(`{"id":10,"name":"NewIndexer","enable":true}`))
 	})
 
 	ts, client := setupProwlarr(t, mux)
@@ -450,7 +450,7 @@ func TestUpdateIndexer(t *testing.T) {
 		if r.Method != "PUT" {
 			t.Errorf("expected PUT, got %s", r.Method)
 		}
-		w.Write([]byte(`{}`))
+		_, _ = w.Write([]byte(`{}`))
 	})
 
 	ts, client := setupProwlarr(t, mux)
@@ -484,7 +484,7 @@ func TestTestAllIndexers(t *testing.T) {
 		if r.Method != "POST" {
 			t.Errorf("expected POST, got %s", r.Method)
 		}
-		json.NewEncoder(w).Encode([]IndexerTestResult{
+		_ = json.NewEncoder(w).Encode([]IndexerTestResult{
 			{ID: 1, IsValid: true},
 			{ID: 2, IsValid: false, ValidationFailures: []struct {
 				ErrorMessage string `json:"errorMessage"`
@@ -512,7 +512,7 @@ func TestTestAllIndexers(t *testing.T) {
 func TestDownloadClients(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v3/downloadclient", func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode([]DownloadClient{
+		_ = json.NewEncoder(w).Encode([]DownloadClient{
 			{
 				ID:             1,
 				Name:           "qBittorrent",
@@ -544,7 +544,7 @@ func TestDownloadClients(t *testing.T) {
 func TestGetMovieByID(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v3/movie/42", func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"id": 42, "title": "Inception", "year": 2010,
 		})
 	})
@@ -567,7 +567,7 @@ func TestUpdateMovie(t *testing.T) {
 		if r.Method != "PUT" {
 			t.Errorf("expected PUT, got %s", r.Method)
 		}
-		w.Write([]byte(`{}`))
+		_, _ = w.Write([]byte(`{}`))
 	})
 
 	ts, client := setupRadarr(t, mux)
@@ -605,7 +605,7 @@ func TestMovies_ServerError(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v3/movie", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(500)
-		w.Write([]byte(`Internal Server Error`))
+		_, _ = w.Write([]byte(`Internal Server Error`))
 	})
 
 	ts, client := setupRadarr(t, mux)
@@ -620,7 +620,7 @@ func TestMovies_ServerError(t *testing.T) {
 func TestMovies_EmptyResponse(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v3/movie", func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode([]Movie{})
+		_ = json.NewEncoder(w).Encode([]Movie{})
 	})
 
 	ts, client := setupRadarr(t, mux)
@@ -641,23 +641,23 @@ func TestRadarrFullWorkflow(t *testing.T) {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/api/v3/movie", func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode([]Movie{
+		_ = json.NewEncoder(w).Encode([]Movie{
 			{ID: 1, Title: "Inception", Year: 2010, HasFile: true},
 		})
 	})
 	mux.HandleFunc("/api/v3/queue", func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(QueuePage{TotalRecords: 0, Records: []QueueRecord{}})
+		_ = json.NewEncoder(w).Encode(QueuePage{TotalRecords: 0, Records: []QueueRecord{}})
 	})
 	mux.HandleFunc("/api/v3/health", func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode([]HealthItem{})
+		_ = json.NewEncoder(w).Encode([]HealthItem{})
 	})
 	mux.HandleFunc("/api/v3/rootfolder", func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode([]RootFolder{
+		_ = json.NewEncoder(w).Encode([]RootFolder{
 			{ID: 1, Path: "/data/media/movies", Accessible: true, FreeSpace: 500_000_000_000},
 		})
 	})
 	mux.HandleFunc("/api/v3/qualityprofile", func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode([]QualityProfile{
+		_ = json.NewEncoder(w).Encode([]QualityProfile{
 			{ID: 1, Name: "HD-1080p"},
 		})
 	})
