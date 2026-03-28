@@ -215,7 +215,7 @@ func tryBuiltinFix(issue Issue) bool {
 			if _, err := os.Stat(p); os.IsNotExist(err) {
 				if err := os.MkdirAll(p, 0755); err != nil {
 					// Try via Docker if permission denied
-					exec.Command("docker", "run", "--rm", "-v", dataPath+":/data", "alpine",
+					_ = exec.Command("docker", "run", "--rm", "-v", dataPath+":/data", "alpine",
 						"mkdir", "-p", "/data/"+d).Run()
 				}
 				created++
@@ -363,7 +363,7 @@ func fixVPNCredentials() bool {
 					if fixComposeVPNVars(composeDir) {
 						// Restart gluetun with updated compose
 						fmt.Printf("  %s Restarting Gluetun with updated compose…\n", ui.GoldText("⟳"))
-						exec.Command("docker", "compose", "-f", filepath.Join(composeDir, "docker-compose.yml"), "up", "-d", "gluetun").Run()
+						_ = exec.Command("docker", "compose", "-f", filepath.Join(composeDir, "docker-compose.yml"), "up", "-d", "gluetun").Run()
 						time.Sleep(5 * time.Second)
 						fmt.Printf("  %s Gluetun restarted with VPN credentials\n\n", ui.Ok("✓"))
 						return true
@@ -427,7 +427,7 @@ func fixVPNCredentials() bool {
 
 	// Restart gluetun
 	fmt.Printf("  %s Restarting Gluetun…\n", ui.GoldText("⟳"))
-	exec.Command("docker", "compose", "-f", filepath.Join(composeDir, "docker-compose.yml"), "up", "-d", "gluetun").Run()
+	_ = exec.Command("docker", "compose", "-f", filepath.Join(composeDir, "docker-compose.yml"), "up", "-d", "gluetun").Run()
 	time.Sleep(5 * time.Second)
 
 	fmt.Printf("  %s VPN credentials provisioned and Gluetun restarted\n", ui.Ok("✓"))
@@ -496,12 +496,12 @@ func fixComposeVPNVars(composeDir string) bool {
 
 	// Backup and regenerate
 	backup := composePath + fmt.Sprintf(".bak.%s", time.Now().Format("20060102-150405"))
-	os.Rename(composePath, backup)
+	_ = os.Rename(composePath, backup)
 
 	content := migrate.GenerateCompose(services, opts)
 	if err := os.WriteFile(composePath, []byte(content), 0644); err != nil {
 		// Restore backup
-		os.Rename(backup, composePath)
+		_ = os.Rename(backup, composePath)
 		return false
 	}
 	fmt.Printf("  %s Regenerated compose with %d services (backup: %s)\n", ui.Ok("✓"), len(services), filepath.Base(backup))

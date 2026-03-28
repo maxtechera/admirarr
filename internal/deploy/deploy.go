@@ -105,7 +105,7 @@ func Service(service string) Result {
 	if err := os.WriteFile(tmpCompose, []byte(content), 0644); err != nil {
 		return Result{Error: fmt.Errorf("cannot write compose file: %v", err)}
 	}
-	defer os.Remove(tmpCompose)
+	defer func() { _ = os.Remove(tmpCompose) }()
 
 	// Docker compose up
 	ctx1, cancel1 := context.WithTimeout(context.Background(), 2*time.Minute)

@@ -22,7 +22,7 @@ func TestCreateAccount(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(Account{
+		_ = json.NewEncoder(w).Encode(Account{
 			Number:    "1234567890123456",
 			ExpiresAt: time.Now().Add(24 * time.Hour),
 		})
@@ -50,7 +50,7 @@ func TestGetToken(t *testing.T) {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
-		json.NewEncoder(w).Encode(AuthToken{AccessToken: "test-token-123"})
+		_ = json.NewEncoder(w).Encode(AuthToken{AccessToken: "test-token-123"})
 	})
 	defer srv.Close()
 
@@ -80,7 +80,7 @@ func TestRegisterDevice(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(Device{
+		_ = json.NewEncoder(w).Encode(Device{
 			ID:          "dev-123",
 			Name:        "admirarr",
 			Pubkey:      "testpubkey==",
@@ -102,7 +102,7 @@ func TestRegisterDevice(t *testing.T) {
 func TestMaxDevicesError(t *testing.T) {
 	srv, client := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(`{"code":"MAX_DEVICES_REACHED"}`))
+		_, _ = w.Write([]byte(`{"code":"MAX_DEVICES_REACHED"}`))
 	})
 	defer srv.Close()
 
@@ -118,7 +118,7 @@ func TestListDevices(t *testing.T) {
 			http.Error(w, "not found", 404)
 			return
 		}
-		json.NewEncoder(w).Encode([]Device{
+		_ = json.NewEncoder(w).Encode([]Device{
 			{ID: "1", Name: "dev1", Pubkey: "key1"},
 			{ID: "2", Name: "dev2", Pubkey: "key2"},
 		})

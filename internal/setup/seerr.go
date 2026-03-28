@@ -229,7 +229,7 @@ func initSeerr(state *SetupState, svc *ServiceState, r *StepResult) {
 	jellyHost := parsed.Hostname()
 	jellyPort := 8096
 	if parsed.Port() != "" {
-		fmt.Sscanf(parsed.Port(), "%d", &jellyPort)
+		_, _ = fmt.Sscanf(parsed.Port(), "%d", &jellyPort)
 	}
 
 	if state.wouldFix(r, "Seerr → Initialize via Jellyfin auth") {
