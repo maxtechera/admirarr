@@ -1,0 +1,8 @@
+#selfhosted
+#plex
+#homelab
+#opensource
+#cli
+#arrstack
+#buildinpublic
+#nodo
