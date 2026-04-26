@@ -1,0 +1,7 @@
+¿Tu stack de Plex + Arr vive bien hasta que algo se rompe? Yo estaba cansado de saltar entre paneles, logs y contenedores para encontrar el problema.
+
+Por eso lancé admirarr: un CLI para ver el estado del stack, correr diagnósticos y destrabar fallas sin abrir cinco tabs.
+
+Si querés el contexto completo, mirá el launch post. Y si lo probás, respondeme con tu output de admirarr doctor.
+
+Link in bio para leer el launch post completo. Si querés el repo, comentá ARRR y te lo paso.
