@@ -56,7 +56,7 @@ jobs:
           # 404.html = shell script (GitHub Pages serves 404.html for root path,
           # making `curl https://get.admirarr.dev | sh` work natively)
           cp install.sh _site/404.html
-          cp packaging/pages/index.html _site/index.html
+          cp -R packaging/pages/. _site/
           echo "get.admirarr.dev" > _site/CNAME
           touch _site/.nojekyll
 

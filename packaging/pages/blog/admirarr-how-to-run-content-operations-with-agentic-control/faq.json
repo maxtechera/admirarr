@@ -1,0 +1,38 @@
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "¿admirarr reemplaza las UIs de Plex, Radarr o Sonarr?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. admirarr funciona como una capa operativa y de diagnóstico. Las interfaces siguen siendo útiles para tareas específicas y para inspección profunda."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "¿sirve solo para Plex?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. El enfoque es más amplio: stacks Plex o Jellyfin combinados con herramientas Arr y servicios asociados."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "¿por qué un CLI y no otra dashboard web?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Porque una CLI bien diseñada reduce fricción, se integra mejor con automatizaciones y sirve tanto para humanos como para agentes."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "¿puedo usarlo aunque mi stack ya esté funcionando?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Sí. admirarr no es solo para instalar. También sirve para observar, diagnosticar y recuperar control cuando el sistema ya está en producción personal."
+      }
+    }
+  ]
+}

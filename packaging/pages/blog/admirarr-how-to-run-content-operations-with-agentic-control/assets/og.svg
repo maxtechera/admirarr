@@ -1,0 +1,23 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="70" y1="0" x2="1100" y2="630" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#020617"/>
+      <stop offset="0.55" stop-color="#0F1C34"/>
+      <stop offset="1" stop-color="#1D4ED8"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#F5D48A"/>
+      <stop offset="1" stop-color="#C78D20"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect x="72" y="74" width="1056" height="482" rx="28" fill="#08111F" stroke="#284B74"/>
+  <text x="114" y="190" fill="#22C55E" font-size="22" font-weight="700" font-family="Inter, Arial, sans-serif">ADMIRARR</text>
+  <text x="114" y="274" fill="#F8FAFC" font-size="66" font-weight="700" font-family="Inter, Arial, sans-serif">Menos paneles, más control</text>
+  <text x="114" y="350" fill="#F8FAFC" font-size="66" font-weight="700" font-family="Inter, Arial, sans-serif">sobre tu media stack</text>
+  <text x="114" y="420" fill="#CBD5E1" font-size="28" font-family="Inter, Arial, sans-serif">Status, doctor y setup para operar Plex + Arr</text>
+  <text x="114" y="460" fill="#CBD5E1" font-size="28" font-family="Inter, Arial, sans-serif">sin saltar entre paneles, logs y contenedores.</text>
+  <rect x="114" y="494" width="250" height="16" rx="8" fill="url(#gold)"/>
+  <text x="850" y="515" fill="#93C5FD" font-size="24" font-family="'DejaVu Sans Mono', monospace">admirarr status</text>
+  <text x="850" y="548" fill="#86EFAC" font-size="22" font-family="'DejaVu Sans Mono', monospace">8/8 online</text>
+</svg>

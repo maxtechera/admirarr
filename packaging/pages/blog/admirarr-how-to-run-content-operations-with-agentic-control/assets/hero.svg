@@ -1,0 +1,52 @@
+<svg width="1200" height="628" viewBox="0 0 1200 628" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="40" y1="30" x2="1120" y2="600" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#07111F"/>
+      <stop offset="0.55" stop-color="#0B1D34"/>
+      <stop offset="1" stop-color="#113B6E"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#F4C76B"/>
+      <stop offset="1" stop-color="#C78D20"/>
+    </linearGradient>
+    <filter id="shadow" x="0" y="0" width="1400" height="800" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="20" stdDeviation="24" flood-color="#020617" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+  <rect width="1200" height="628" fill="url(#bg)"/>
+  <g opacity="0.14">
+    <path d="M0 90H1200M0 180H1200M0 270H1200M0 360H1200M0 450H1200M0 540H1200" stroke="#93C5FD"/>
+    <path d="M100 0V628M220 0V628M340 0V628M460 0V628M580 0V628M700 0V628M820 0V628M940 0V628M1060 0V628" stroke="#93C5FD"/>
+  </g>
+  <circle cx="1006" cy="115" r="82" fill="#1D4ED8" opacity="0.16"/>
+  <circle cx="920" cy="510" r="120" fill="#22C55E" opacity="0.08"/>
+  <g filter="url(#shadow)">
+    <rect x="620" y="96" width="490" height="362" rx="22" fill="#020817" stroke="#1E3A5F"/>
+    <rect x="620" y="96" width="490" height="42" rx="22" fill="#0D1726"/>
+    <circle cx="652" cy="117" r="6" fill="#EF4444"/>
+    <circle cx="674" cy="117" r="6" fill="#F59E0B"/>
+    <circle cx="696" cy="117" r="6" fill="#22C55E"/>
+    <text x="736" y="123" fill="#93C5FD" font-size="17" font-family="'DejaVu Sans Mono', monospace">admirarr terminal</text>
+    <text x="654" y="182" fill="#E2E8F0" font-size="23" font-family="'DejaVu Sans Mono', monospace">$ admirarr status</text>
+    <text x="654" y="222" fill="#7DD3FC" font-size="18" font-family="'DejaVu Sans Mono', monospace">services   8/8 online</text>
+    <text x="654" y="252" fill="#7DD3FC" font-size="18" font-family="'DejaVu Sans Mono', monospace">downloads  3 active</text>
+    <text x="654" y="282" fill="#7DD3FC" font-size="18" font-family="'DejaVu Sans Mono', monospace">disk       2.4 TB / 8.0 TB</text>
+    <text x="654" y="332" fill="#E2E8F0" font-size="23" font-family="'DejaVu Sans Mono', monospace">$ admirarr doctor</text>
+    <text x="654" y="372" fill="#86EFAC" font-size="18" font-family="'DejaVu Sans Mono', monospace">✓ containers healthy</text>
+    <text x="654" y="402" fill="#86EFAC" font-size="18" font-family="'DejaVu Sans Mono', monospace">✓ api keys valid</text>
+    <text x="654" y="432" fill="#FDE68A" font-size="18" font-family="'DejaVu Sans Mono', monospace">! vpn requires attention</text>
+  </g>
+  <text x="86" y="146" fill="#F8FAFC" font-size="58" font-weight="700" font-family="Inter, Arial, sans-serif">Menos paneles.</text>
+  <text x="86" y="212" fill="#F8FAFC" font-size="58" font-weight="700" font-family="Inter, Arial, sans-serif">Más control sobre</text>
+  <text x="86" y="278" fill="url(#gold)" font-size="58" font-weight="700" font-family="Inter, Arial, sans-serif">tu Plex + Arr stack.</text>
+  <text x="86" y="346" fill="#CBD5E1" font-size="27" font-family="Inter, Arial, sans-serif">El launch post de admirarr, un CLI para status, doctor</text>
+  <text x="86" y="384" fill="#CBD5E1" font-size="27" font-family="Inter, Arial, sans-serif">y setup con una sola capa operativa.</text>
+  <g>
+    <rect x="86" y="454" width="128" height="38" rx="19" fill="#22C55E"/>
+    <text x="112" y="479" fill="#052E16" font-size="16" font-weight="700" font-family="Inter, Arial, sans-serif">BLOG POST</text>
+  </g>
+  <g>
+    <rect x="86" y="514" width="260" height="46" rx="23" fill="#0F172A" stroke="#284B74"/>
+    <text x="112" y="543" fill="#93C5FD" font-size="20" font-family="Inter, Arial, sans-serif">get.admirarr.dev/blog</text>
+  </g>
+</svg>
